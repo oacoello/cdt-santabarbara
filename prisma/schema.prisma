@@ -1,0 +1,41 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  // ELIMINAMOS la línea de url = env(...)
+}
+
+model User {
+  id            String    @id @default(cuid())
+  username      String    @unique
+  password      String
+  email         String
+  rank          String?   @default("Operador")
+  role          Role      @default(USER)
+  canUseSim     Boolean   @default(true)
+  canUseCalc    Boolean   @default(false)
+  canUseArchive Boolean   @default(false)
+  canUseFT      Boolean   @default(false)
+  reports       Report[]
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+}
+
+model Report {
+  id          String   @id @default(cuid())
+  title       String
+  data        Json     
+  timestamp   DateTime @default(now())
+  userId      String
+  user        User     @relation(fields: [userId], references: [id])
+}
+
+enum Role {
+  USER
+  ADMIN
+  SUPERADMIN
+}

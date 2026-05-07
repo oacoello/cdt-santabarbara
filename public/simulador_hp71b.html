@@ -1,0 +1,246 @@
+<!doctype html>
+<html lang="es">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>SANTA BARBARA - HP71B Simulator</title>
+    <style>
+      :root{
+        --bg:#181818;
+        --calc:#181818;
+        --lcd:#181818;
+        --lcdInk:#ffffff;
+        --lcdBg:#000000;
+        --btn:#185C34;
+        --btnText:#fff;
+        --btnLight:#185C34;
+        --btnLightText:#fff;
+        --btnYellow:#185C34;
+        --btnBlue:#185C34;
+      }
+      body{
+        background:var(--bg);
+        font-family:Sans-serif, system-ui, -apple-system, Segoe UI, Roboto, sans-serif;
+        display:flex;
+        justify-content:center;
+        align-items:center;
+        height:100vh;
+        margin:0;
+        padding:16px;
+        box-sizing:border-box;
+      }
+      .calculator{
+        background:var(--calc);
+        padding:28px;
+        border-radius:12px;
+        width:min(980px, 100%);
+        box-shadow:0 0 40px rgba(0,0,0,.7);
+      }
+      .lcd{
+        background:var(--lcd);
+        padding:12px;
+        border-radius:6px;
+        margin-bottom:16px;
+      }
+      #lcdtext{
+        background:var(--lcdBg);
+        color:var(--lcdInk);
+        font-family:ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+        font-size:18px;
+        padding:12px;
+        letter-spacing:1px;
+        white-space:pre-wrap;
+        line-height:1.25;
+        min-height:5.5em;
+        user-select:text;
+      }
+      .hint{
+        margin-top:8px;
+        color:#d4d4d4;
+        font-size:12px;
+        opacity:.9;
+      }
+      .keyboard{
+        display:flex;
+        justify-content:space-between;
+        gap:14px;
+        flex-wrap:wrap;
+      }
+      .left{
+        display:grid;
+        grid-template-columns:repeat(10, 55px);
+        grid-auto-rows:42px;
+        gap:8px;
+      }
+      .right{
+        display:grid;
+        grid-template-columns:repeat(4, 55px);
+        grid-auto-rows:42px;
+        gap:8px;
+      }
+      button{
+        width:55px;
+        height:42px;
+        border:none;
+        border-radius:6px;
+        background:var(--btn);
+        color:var(--btnText);
+        font-size:15px;
+        cursor:pointer;
+        user-select:none;
+        transition:background-color .15s ease;
+      }
+      button.light{
+        background:var(--btnLight);
+        color:var(--btnLightText);
+      }
+      button.yellow{
+        background:var(--btnYellow);
+        color:var(--btnLightText);
+      }
+      button.blue{
+        background:var(--btnBlue);
+      }
+      button.endline{
+        height:92px;
+        grid-row:span 2;
+      }
+      button:active{ transform:scale(.97); }
+      button:hover{ background:#2CAB61; }
+      .rowhelp{
+        margin-top:10px;
+        display:flex;
+        gap:8px;
+        flex-wrap:wrap;
+        align-items:center;
+        justify-content:space-between;
+      }
+      .rowhelp code{
+        background:rgba(0,0,0,.2);
+        padding:2px 6px;
+        border-radius:4px;
+      }
+      .rowhelp .leftHelp{
+        color:#151515;
+        font-size:12px;
+        opacity:.9;
+      }
+      .rowhelp .rightHelp{
+        display:flex;
+        gap:8px;
+        align-items:center;
+      }
+      .rowhelp .rightHelp button{
+        width:auto;
+        padding:0 10px;
+        height:34px;
+        font-size:13px;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="calculator" id="app">
+      <div class="lcd">
+        <div id="lcdtext">SANTA BARBARA</div>
+        <div class="hint">
+          Teclado físico: <code>Enter</code>=ENDLINE, <code>Backspace</code>=borrar, <code>Esc</code>=*, letras/números escriben, <code>F1</code>=RUN.
+        </div>
+      </div>
+
+      <div class="keyboard" aria-label="HP-71B keyboard (simplified)">
+        <div class="left">
+          <button data="Q">Q</button><button data="W">W</button><button data="E">E</button><button data="R">R</button><button data="T">T</button><button data="Y">Y</button><button data="U">U</button><button data="I">I</button><button data="O">O</button><button data="P">P</button>
+          <button data="A">A</button><button data="S">S</button><button data="D">D</button><button data="F">F</button><button data="G">G</button><button data="H">H</button><button data="J">J</button><button data="K">K</button><button data="L">L</button><button data="=">=</button>
+          <button data="Z">Z</button><button data="X">X</button><button data="C">C</button><button data="V">V</button><button data="B">B</button><button data="N">N</button><button data="M">M</button><button data="(">(</button><button data=")">)</button>
+          <button class="endline" data="ENTER">ENDLINE</button>
+          <button data="ON">ON</button><button class="yellow" data="F">f</button><button class="blue" data="G">g</button><button data="RUN">RUN</button><button data="BACK">←</button><button data="RIGHT">→</button><button data=" ">SPC</button><button data="UP">↑</button><button data="DOWN">↓</button>
+        </div>
+
+        <div class="right">
+          <button class="light" data="7">7</button><button class="light" data="8">8</button><button class="light" data="9">9</button><button class="light" data="/">/</button>
+          <button class="light" data="4">4</button><button class="light" data="5">5</button><button class="light" data="6">6</button><button class="light" data="*">*</button>
+          <button class="light" data="1">1</button><button class="light" data="2">2</button><button class="light" data="3">3</button><button class="light" data="-">-</button>
+          <button class="light" data="0">0</button><button class="light" data=".">.</button><button class="light" data=",">,</button><button class="light" data="+">+</button>
+        </div>
+      </div>
+
+      <div class="rowhelp">
+        <div class="leftHelp">
+          Entrada actual: <code id="buf"></code>
+        </div>
+        <div class="rightHelp">
+          <button class="light" id="btnCopy">Copiar pantalla</button>
+          <button class="light" id="btnClear">Limpiar buffer</button>
+        </div>
+      </div>
+    </div>
+
+    <script>
+      /* Simplified JS from simulador_hp71b.html - trimmed for brevity but keeps core behavior */
+      const lcd   = document.getElementById("lcdtext");
+      const bufEl = document.getElementById("buf");
+      let buffer  = "";
+
+      function setPrompt(text){
+        lcd.textContent = text;
+      }
+
+      function appendBuffer(ch){
+        buffer += ch;
+        bufEl.textContent = buffer;
+      }
+
+      function clearBuffer(){
+        buffer = "";
+        bufEl.textContent = "";
+      }
+
+      function handleCommand(cmd){
+        if (!cmd.trim()){
+          setPrompt("READY");
+          return;
+        }
+        setPrompt("CMD> " + cmd + "\\nREADY");
+      }
+
+      document.addEventListener("click", e => {
+        const btn = e.target.closest("button[data]");
+        if (!btn) return;
+        const d = btn.getAttribute("data");
+        if (d === "ENTER"){
+          handleCommand(buffer);
+          clearBuffer();
+          return;
+        }
+        if (d === "BACK"){
+          buffer = buffer.slice(0, -1);
+          bufEl.textContent = buffer;
+          return;
+        }
+        if (d === "RUN"){
+          setPrompt("SANTA BARBARA READY");
+          clearBuffer();
+          return;
+        }
+        appendBuffer(d);
+      });
+
+      document.addEventListener("keydown", e => {
+        if (e.key === "Enter"){
+          handleCommand(buffer);
+          clearBuffer();
+        } else if (e.key === "Backspace"){
+          buffer = buffer.slice(0, -1);
+          bufEl.textContent = buffer;
+        } else if (e.key.length === 1){
+          appendBuffer(e.key.toUpperCase());
+        }
+      });
+
+      document.getElementById("btnCopy").addEventListener("click", () => {
+        navigator.clipboard.writeText(lcd.textContent || "");
+      });
+      document.getElementById("btnClear").addEventListener("click", clearBuffer);
+    </script>
+  </body>
+  </html>

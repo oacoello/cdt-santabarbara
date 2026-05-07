@@ -1,0 +1,40 @@
+{
+	"folders": [
+		{
+			"path": "."
+		}
+	],
+	"settings": {
+		"IDX.agenticWorkspace": true
+	},
+	"launch": {
+		"version": "0.2.0",
+		"configurations": [
+			{
+				"name": "Next.js: Debug Client",
+				"type": "chrome",
+				"request": "launch",
+				"url": "http://localhost:9002",
+				"webRoot": "${workspaceFolder}",
+				"sourceMapPathOverrides": {
+					"webpack:///./*": "${webRoot}/*"
+				}
+			},
+			{
+				"name": "Next.js: Debug Server",
+				"type": "node",
+				"request": "launch",
+				"program": "${workspaceFolder}/node_modules/.bin/next",
+				"args": [
+					"dev",
+					"-p",
+					"9002"
+				],
+				"sourceMaps": true,
+				"env": {
+					"NODE_OPTIONS": "--inspect"
+				}
+			}
+		]
+	}
+}
