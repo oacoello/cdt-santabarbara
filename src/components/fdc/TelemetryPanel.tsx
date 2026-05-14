@@ -72,7 +72,7 @@ export function TelemetryPanel({
             disabled={isMetLoading}
             onClick={async () => {
               setIsMetLoading(true);
-              const data = await getTacticalMet(parseFloat(probeLat), parseFloat(probeLng));
+              const data = await getTacticalMet({ lat: parseFloat(probeLat), lng: parseFloat(probeLng) });
               setManualMet(data);
               setIsMetLoading(false);
               if(data) toast({ title: "Enlace MET Establecido", description: "Datos atmosféricos actualizados exitosamente." });

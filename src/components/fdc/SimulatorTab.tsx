@@ -4,8 +4,8 @@ import React, { useState, useMemo } from "react";
 import { Globe, Search } from "lucide-react";
 import dynamic from "next/dynamic";
 const TacticalMap = dynamic(
-  () => import("@/components/TacticalMap").then((mod) => mod.TacticalMap),
-  { ssr: false },
+  () => import("@/components/TacticalMapMapcn").then((mod) => mod.TacticalMapMapcn),
+  { ssr: false }
 );
 import { ControlPanel } from "@/components/ControlPanel";
 import {
@@ -50,6 +50,8 @@ interface SimulatorTabProps {
   handleUpdatePosition?: (mode: "PIEZA" | "OBJETIVO", coord: LatLng) => void;
   realLatLng: LatLng | null;
   handleAOCorrection: (otLine: number, lr: number, ad: number) => void;
+  onDrawMapModel?: (bounds: [LatLng, LatLng]) => void;
+  mapModelBounds?: [LatLng, LatLng] | null;
 }
 
 export function SimulatorTab({
@@ -79,6 +81,8 @@ export function SimulatorTab({
   beamType,
   setBeamType,
   handleAOCorrection,
+  onDrawMapModel,
+  mapModelBounds,
 }: SimulatorTabProps) {
   const [otLine, setOtLine] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
@@ -201,7 +205,7 @@ export function SimulatorTab({
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value)}
                   onKeyDown={handleSearch}
-                  placeholder="LAT LNG o ZONA ESTE NORTE..."
+                  placeholder="COORDENADAS GB AQUI..."
                   className="w-64 h-11 pl-10 bg-[#0A0A0B]/80 backdrop-blur-xl border-2 border-[#7c4a3a] focus:border-[#F39C63] text-white font-black text-[10px] tracking-widest rounded-xl transition-all duration-300 outline-none placeholder:text-white/20 shadow-2xl"
                 />
               </div>
@@ -221,6 +225,7 @@ export function SimulatorTab({
               showExplosion={showExplosion}
               fireProgress={fireProgress}
               isGunLocated={isGunLocated}
+              mapModelBounds={mapModelBounds}
             />
           </div>
 
@@ -247,6 +252,7 @@ export function SimulatorTab({
           onAdjust={handleAdjust} onFire={handleFire} onReport={handleGenerateReport}
           onSetGun={() => handleSetGun(mapCenter)} onSetTarget={() => handleSetTarget(mapCenter)}
           onUpdatePosition={handleUpdatePosition || internalHandleUpdatePosition}
+          onDrawMapModel={onDrawMapModel}
           isFiring={isFiring} isGeneratingReport={false} numPieces={numPieces} beamType={beamType}
         />
       </div>

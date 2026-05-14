@@ -1,2 +1,5 @@
-# cdt-santabarbara
-An artillery firing center that uses the Hewlett-Packard HP-71B computer as its ballistic engine for calculating missile trajectories.
+k# Firebase Studio
+
+This is a NextJS starter in Firebase Studio.
+
+To get started, take a look at src/app/page.tsx.

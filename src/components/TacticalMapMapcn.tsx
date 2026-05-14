@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
-const MAPTILER_KEY = 'APIDELMAPA'; 
+const MAPTILER_KEY = 'VRmMIQ93urJL9gK2BcI1'; 
 const MAP_STYLE = `https://api.maptiler.com/maps/outdoor-v2-dark/style.json?key=${MAPTILER_KEY}`;
 
 interface TacticalMapProps {
@@ -25,6 +25,7 @@ interface TacticalMapProps {
   showExplosion?: boolean;
   fireProgress?: number;
   isGunLocated?: boolean;
+  mapModelBounds?: [LatLng, LatLng] | null;
 }
 
 /**
@@ -70,6 +71,7 @@ export function TacticalMapMapcn({
   onCenterChange,
   isFiring,
   fireProgress = 0,
+  mapModelBounds,
 }: TacticalMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
@@ -142,6 +144,61 @@ export function TacticalMapMapcn({
       source.setData({ type: 'Feature', geometry: { type: 'LineString', coordinates: [] }, properties: {} });
     }
   }, [fireProgress, isFiring, gunPosition, targetPosition]);
+
+  // Map Model Bounds Rectangle
+  useEffect(() => {
+    if (!map.current || !map.current.isStyleLoaded()) return;
+
+    if (mapModelBounds) {
+      const bounds = mapModelBounds;
+      const rectangleData: GeoJSON.Feature<GeoJSON.Polygon> = {
+        type: 'Feature',
+        geometry: {
+          type: 'Polygon',
+          coordinates: [[
+            [bounds[0].lng, bounds[0].lat], // SW
+            [bounds[1].lng, bounds[0].lat], // SE
+            [bounds[1].lng, bounds[1].lat], // NE
+            [bounds[0].lng, bounds[1].lat], // NW
+            [bounds[0].lng, bounds[0].lat]  // Close
+          ]]
+        },
+        properties: {}
+      };
+
+      if (map.current.getSource('map-model-rectangle')) {
+        (map.current.getSource('map-model-rectangle') as maplibregl.GeoJSONSource).setData(rectangleData);
+      } else {
+        map.current.addSource('map-model-rectangle', {
+          type: 'geojson',
+          data: rectangleData
+        });
+
+        map.current.addLayer({
+          id: 'map-model-rectangle',
+          type: 'line',
+          source: 'map-model-rectangle',
+          paint: {
+            'line-color': '#3B82F6',
+            'line-width': 3,
+            'line-opacity': 1,
+            'line-dasharray': [2, 2]
+          }
+        });
+      }
+      
+      // Zoom para enmarcar el mapa modelo
+      map.current.fitBounds([
+        [bounds[0].lng, bounds[0].lat],
+        [bounds[1].lng, bounds[1].lat]
+      ], { padding: 50, duration: 1500 });
+    } else {
+      if (map.current.getSource('map-model-rectangle')) {
+        map.current.removeLayer('map-model-rectangle');
+        map.current.removeSource('map-model-rectangle');
+      }
+    }
+  }, [mapModelBounds]);
 
   useEffect(() => {
     if (!map.current) return;

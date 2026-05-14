@@ -11,7 +11,8 @@ export async function POST(request: NextRequest) {
     }
 
     // Reenvío directo al servidor real
-    const backendRes = await fetch(`http://127.0.0.1:8080/input?cmd=${encodeURIComponent(cmd)}`, {
+    const backendUrl = process.env.HP71_BACKEND_URL ?? 'http://127.0.0.1:8080';
+    const backendRes = await fetch(`${backendUrl}/input?cmd=${encodeURIComponent(cmd)}`, {
       method: 'POST',
     });
 

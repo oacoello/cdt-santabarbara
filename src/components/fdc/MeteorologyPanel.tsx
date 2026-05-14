@@ -16,7 +16,8 @@ export function MeteorologyPanel({ position }: MeteorologyPanelProps) {
 
   const updateMet = async () => {
     setLoading(true);
-    const data = await getTacticalMet(position.lat, position.lng);
+    // getTacticalMet espera un objeto LatLng, no dos argumentos.
+    const data = getTacticalMet(position);
     setMet(data);
     setLoading(false);
   };
@@ -32,9 +33,9 @@ export function MeteorologyPanel({ position }: MeteorologyPanelProps) {
           <Cloud className="w-3 h-3 text-[#F39C63]" />
           <h3 className="text-xs font-black uppercase tracking-widest text-[#F39C63]">Meteorología Táctica</h3>
         </div>
-        <Button 
-          variant="ghost" 
-          size="icon" 
+        <Button
+          variant="ghost"
+          size="icon"
           onClick={updateMet}
           className="h-7 w-7 text-[#F39C63]/60 hover:text-[#F39C63] transition-colors"
           disabled={loading}
@@ -49,12 +50,12 @@ export function MeteorologyPanel({ position }: MeteorologyPanelProps) {
         </div>
       ) : (
         <div className="grid grid-cols-2 gap-2">
-          <MetStat icon={<Thermometer/>} label="Temp" value={met.temp} unit="°C" />
-          <MetStat icon={<Gauge/>} label="Presión" value={met.pressure} unit="hPa" />
-          <MetStat icon={<Wind/>} label="Viento" value={met.windSpeed} unit="m/s" />
-          <MetStat icon={<Wind/>} label="Dir" value={met.windDirMils} unit="MIL" isSpecial />
-          <MetStat icon={<Droplets/>} label="Humedad" value={met.humidity} unit="%" />
-          <MetStat icon={<Cloud/>} label="Altitud" value={met.elevation} unit="m" />
+          <MetStat icon={<Thermometer />} label="Temp" value={met.temp} unit="°C" />
+          <MetStat icon={<Gauge />} label="Presión" value={met.pressure} unit="hPa" />
+          <MetStat icon={<Wind />} label="Viento" value={met.windSpeed} unit="m/s" />
+          <MetStat icon={<Wind />} label="Dir" value={met.windDirMils} unit="MIL" isSpecial />
+          <MetStat icon={<Droplets />} label="Humedad" value={met.humidity} unit="%" />
+          <MetStat icon={<Cloud />} label="Altitud" value={met.elevation} unit="m" />
         </div>
       )}
     </Card>
@@ -62,6 +63,9 @@ export function MeteorologyPanel({ position }: MeteorologyPanelProps) {
 }
 
 function MetStat({ icon, label, value, unit, isSpecial = false }: { icon: React.ReactNode, label: string, value: number, unit: string, isSpecial?: boolean }) {
+  // Redondear a máximo 1 cifra decimal
+  const displayValue = Math.round(value * 10) / 10;
+
   return (
     <div className="bg-black/20 p-2 rounded-lg border border-white/5">
       <div className="flex items-center gap-1.5 mb-1 opacity-60">
@@ -70,7 +74,7 @@ function MetStat({ icon, label, value, unit, isSpecial = false }: { icon: React.
       </div>
       <div className="flex items-baseline gap-1">
         <span className={`text-sm font-black font-mono ${isSpecial ? 'text-[#F39C63]' : 'text-white'}`}>
-          {value}
+          {displayValue}
         </span>
         <span className="text-[8px] font-bold text-white/30">{unit}</span>
       </div>

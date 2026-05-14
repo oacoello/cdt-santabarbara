@@ -18,6 +18,7 @@ import {
 } from "@/components/ui/select";
 import { type LatLng, type WeaponSystem, computeFiringSolution, WEAPON_DATA } from '@/lib/ballistics';
 import { cn } from '@/lib/utils';
+import { utmToLatLon } from '@/lib/coordinates';
 
 interface ControlPanelProps {
   gunPosition: LatLng | null;
@@ -34,6 +35,7 @@ interface ControlPanelProps {
   onSetGun?: () => void;
   onSetTarget?: () => void;
   onUpdatePosition?: (mode: 'PIEZA' | 'OBJETIVO', coord: LatLng) => void;
+  onDrawMapModel?: (bounds: [LatLng, LatLng]) => void;
   isFiring: boolean;
   isGeneratingReport: boolean;
   numPieces: number;
@@ -55,6 +57,7 @@ export function ControlPanel({
   onSetGun,
   onSetTarget,
   onUpdatePosition,
+  onDrawMapModel,
   isFiring,
   isGeneratingReport,
   numPieces,
@@ -62,17 +65,42 @@ export function ControlPanel({
 }: ControlPanelProps) {
   const [showBatteryDetails, setShowBatteryDetails] = useState(false);
   const [activeEditMode, setActiveEditMode] = useState<'PIEZA' | 'OBJETIVO'>('OBJETIVO');
+  const [maxE, setMaxE] = useState('473000');
+  const [minE, setMinE] = useState('447000');
+  const [maxN, setMaxN] = useState('1584000');
+  const [minN, setMinN] = useState('1567000');
+  const [zona, setZona] = useState('16');
+  const [esferoide, setEsferoide] = useState('1');
+
+  const handleDrawMapModel = () => {
+    if (!onDrawMapModel) return;
+
+    try {
+      // Las coordenadas ingresadas son en realidad UTM (Este/Norte)
+      const pointMax = utmToLatLon(Number(maxE), Number(maxN), Number(zona), esferoide);
+      const pointMin = utmToLatLon(Number(minE), Number(minN), Number(zona), esferoide);
+
+      const bounds: [LatLng, LatLng] = [
+        { lat: pointMin.latitude, lng: pointMin.longitude }, // SW
+        { lat: pointMax.latitude, lng: pointMax.longitude }  // NE
+      ];
+
+      onDrawMapModel(bounds);
+    } catch (error) {
+      console.error('Error converting UTM:', error);
+    }
+  };
 
   // Función de ajuste fino
   const handleFineAdjustment = (direction: 'up' | 'down' | 'left' | 'right') => {
     if (!onUpdatePosition) return;
-    
+
     const currentCoord = activeEditMode === 'PIEZA' ? gunPosition : targetPosition;
     if (!currentCoord) return;
-    
+
     const step = 0.00005; // Precisión métrica (~5m)
     let newCoord: LatLng = { ...currentCoord };
-    
+
     switch (direction) {
       case 'up': // Alargar (aumentar distancia)
         newCoord.lat += step;
@@ -87,7 +115,7 @@ export function ControlPanel({
         newCoord.lng += step;
         break;
     }
-    
+
     onUpdatePosition(activeEditMode, newCoord);
   };
 
@@ -136,6 +164,31 @@ export function ControlPanel({
   }, [position, isDragged]);
 
   const sol = (targetPosition && gunPosition) ? computeFiringSolution(gunPosition, targetPosition, weapon, charge) : null;
+
+  // Referencias para detectar cambios reales en posiciones o arma
+  const lastTargetStr = useRef(targetPosition ? `${targetPosition.lat},${targetPosition.lng}` : '');
+  const lastGunStr = useRef(gunPosition ? `${gunPosition.lat},${gunPosition.lng}` : '');
+  const lastWeapon = useRef(weapon);
+
+  // Auto-ajustar la carga propulsora cuando se mueve la pieza o el objetivo
+  useEffect(() => {
+    const currentTargetStr = targetPosition ? `${targetPosition.lat},${targetPosition.lng}` : '';
+    const currentGunStr = gunPosition ? `${gunPosition.lat},${gunPosition.lng}` : '';
+
+    const positionOrWeaponChanged =
+      currentTargetStr !== lastTargetStr.current ||
+      currentGunStr !== lastGunStr.current ||
+      weapon !== lastWeapon.current;
+
+    if (positionOrWeaponChanged) {
+      if (sol?.recommendedCharge && sol.recommendedCharge !== charge) {
+        setCharge(sol.recommendedCharge);
+      }
+      lastTargetStr.current = currentTargetStr;
+      lastGunStr.current = currentGunStr;
+      lastWeapon.current = weapon;
+    }
+  }, [sol?.recommendedCharge, charge, targetPosition, gunPosition, weapon, setCharge]);
 
   return (
     <div
@@ -218,6 +271,78 @@ export function ControlPanel({
               </div>
             </div>
 
+            {/* ─── Mapa Modelo ─── */}
+            <div className="flex-none w-full lg:w-64 space-y-3">
+              <div className="flex items-center gap-2">
+                <div className="w-1 h-3 bg-primary rounded-full" />
+                <h2 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">Mapa modelo</h2>
+              </div>
+              <div className="space-y-3">
+                <div className="grid grid-cols-2 gap-3">
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground ml-1 tracking-wider">MAX E</span>
+                    <input
+                      type="number"
+                      value={maxE}
+                      onChange={(e) => setMaxE(e.target.value)}
+                      className="w-full bg-background border border-border h-10 text-sm font-bold rounded-xl hover:bg-secondary transition-colors px-3"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground ml-1 tracking-wider">MIN E</span>
+                    <input
+                      type="number"
+                      value={minE}
+                      onChange={(e) => setMinE(e.target.value)}
+                      className="w-full bg-background border border-border h-10 text-sm font-bold rounded-xl hover:bg-secondary transition-colors px-3"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground ml-1 tracking-wider">MAX N</span>
+                    <input
+                      type="number"
+                      value={maxN}
+                      onChange={(e) => setMaxN(e.target.value)}
+                      className="w-full bg-background border border-border h-10 text-sm font-bold rounded-xl hover:bg-secondary transition-colors px-3"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground ml-1 tracking-wider">MIN N</span>
+                    <input
+                      type="number"
+                      value={minN}
+                      onChange={(e) => setMinN(e.target.value)}
+                      className="w-full bg-background border border-border h-10 text-sm font-bold rounded-xl hover:bg-secondary transition-colors px-3"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground ml-1 tracking-wider">ZONA</span>
+                    <input
+                      type="number"
+                      value={zona}
+                      onChange={(e) => setZona(e.target.value)}
+                      className="w-full bg-background border border-border h-10 text-sm font-bold rounded-xl hover:bg-secondary transition-colors px-3"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground ml-1 tracking-wider">ESFEROIDE</span>
+                    <input
+                      type="number"
+                      value={esferoide}
+                      onChange={(e) => setEsferoide(e.target.value)}
+                      className="w-full bg-background border border-border h-10 text-sm font-bold rounded-xl hover:bg-secondary transition-colors px-3"
+                    />
+                  </div>
+                </div>
+                <Button
+                  onClick={handleDrawMapModel}
+                  className="w-full bg-[#F39C63] hover:bg-[#F39C63]/90 text-[#0A0A0B] font-black uppercase tracking-widest h-10 shadow-[0_0_15px_rgba(243,156,99,0.3)] transition-all duration-300"
+                >
+                  Dibujar mapa modelo
+                </Button>
+              </div>
+            </div>
+
             <Separator orientation="vertical" className="hidden lg:block h-32 my-auto bg-border" />
 
             {/* ─── Datos de Tiro ─── */}
@@ -227,9 +352,9 @@ export function ControlPanel({
                 <h2 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">Datos de tiro</h2>
               </div>
               <div className="space-y-2">
-                <FiringRow label="Alcance" value={sol ? sol.range.toFixed(0) : "0"} unit="m" />
+                <FiringRow label="Alcance" value={sol && typeof sol.range === 'number' ? sol.range.toFixed(0) : "0"} unit="m" />
                 <FiringRow label="Elevación" value={sol ? sol.elevMils.toString() : "0"} unit="MIL" valueClassName="text-primary" />
-                <FiringRow label="Azimut" value={sol ? sol.azimuth.toString() : "0"} unit="MIL" valueClassName="text-yellow-500" />
+                <FiringRow label="Azimut" value={sol ? Math.round(sol.azimuth).toString() : "0"} unit="MIL" valueClassName="text-yellow-500" />
                 <FiringRow label="Tiempo de vuelo" value={sol ? sol.timeOfFlight.toFixed(1) : "0"} unit="s" />
               </div>
 
@@ -277,8 +402,8 @@ export function ControlPanel({
                     onClick={() => { setActiveEditMode('PIEZA'); onSetGun?.(); }}
                     className={cn(
                       "flex-1 h-10 text-[11px] font-black uppercase rounded-xl transition-colors gap-2",
-                      activeEditMode === 'PIEZA' 
-                        ? "bg-[#F39C63] text-black border-[#F39C63]" 
+                      activeEditMode === 'PIEZA'
+                        ? "bg-[#F39C63] text-black border-[#F39C63]"
                         : "bg-background border-border hover:bg-secondary"
                     )}
                   >
@@ -290,8 +415,8 @@ export function ControlPanel({
                     onClick={() => { setActiveEditMode('OBJETIVO'); onSetTarget?.(); }}
                     className={cn(
                       "flex-1 h-10 text-[11px] font-black uppercase rounded-xl transition-colors gap-2",
-                      activeEditMode === 'OBJETIVO' 
-                        ? "bg-[#F39C63] text-black border-[#F39C63]" 
+                      activeEditMode === 'OBJETIVO'
+                        ? "bg-[#F39C63] text-black border-[#F39C63]"
                         : "bg-background border-border hover:bg-secondary"
                     )}
                   >
@@ -304,53 +429,53 @@ export function ControlPanel({
             <Separator orientation="vertical" className="hidden lg:block h-32 my-auto bg-border" />
 
             {/* ─── Acciones Finales ─── */}
-<div className="flex-none flex flex-col gap-3 min-w-[200px]">
-  <div className="flex items-center gap-2">
-    <div className="w-1 h-3 bg-primary rounded-full" />
-    <h2 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">Acciones</h2>
-  </div>
-  <div className="flex flex-row lg:flex-col gap-3">
-      {numPieces > 1 && (
-        <Button
-          variant="ghost"
-          size="sm"
-          onClick={() => setShowBatteryDetails(!showBatteryDetails)}
-          className={cn(
-            "h-10 text-[11px] font-black uppercase gap-2 rounded-xl transition-colors border border-border",
-            showBatteryDetails ? "text-primary bg-secondary" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
-          )}
-        >
-          {showBatteryDetails ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-          {showBatteryDetails ? 'Ocultar datos de batería' : 'Ver datos de batería'}
-        </Button>
-      )}
-      <Button
-        onClick={onFire}
-        disabled={!targetPosition || !isGunLocated || isFiring}
-        className={cn(
-          "flex-1 font-black uppercase tracking-[0.2em] gap-3 h-16 shadow-2xl active:scale-95 transition-all text-xs rounded-2xl border-t border-white/20",
-          numPieces > 1
-            ? "bg-[#F39C63] text-black hover:bg-[#F39C63]/90 shadow-[#F39C63]/20" 
-            : "bg-gradient-to-br from-primary to-green-800 hover:from-primary/90 hover:to-green-700 shadow-green-900/40"
-        )}
-      >
-        <div className={cn("p-1.5 bg-black/20 rounded-lg", isFiring && "animate-pulse")}>
-          <Zap className="w-5 h-5 fill-current" />
-        </div>
-        {isFiring ? 'EN VUELO' : numPieces > 1 ? `FUEGO DE BATERÍA (${numPieces})` : 'EJECUTAR FUEGO'}
-      </Button>
+            <div className="flex-none flex flex-col gap-3 min-w-[200px]">
+              <div className="flex items-center gap-2">
+                <div className="w-1 h-3 bg-primary rounded-full" />
+                <h2 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">Acciones</h2>
+              </div>
+              <div className="flex flex-row lg:flex-col gap-3">
+                {numPieces > 1 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowBatteryDetails(!showBatteryDetails)}
+                    className={cn(
+                      "h-10 text-[11px] font-black uppercase gap-2 rounded-xl transition-colors border border-border",
+                      showBatteryDetails ? "text-primary bg-secondary" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
+                    )}
+                  >
+                    {showBatteryDetails ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
+                    {showBatteryDetails ? 'Ocultar datos de batería' : 'Ver datos de batería'}
+                  </Button>
+                )}
+                <Button
+                  onClick={onFire}
+                  disabled={!targetPosition || !isGunLocated || isFiring}
+                  className={cn(
+                    "flex-1 font-black uppercase tracking-[0.2em] gap-3 h-16 shadow-2xl active:scale-95 transition-all text-xs rounded-2xl border-t border-white/20",
+                    numPieces > 1
+                      ? "bg-[#F39C63] text-black hover:bg-[#F39C63]/90 shadow-[#F39C63]/20"
+                      : "bg-gradient-to-br from-primary to-green-800 hover:from-primary/90 hover:to-green-700 shadow-green-900/40"
+                  )}
+                >
+                  <div className={cn("p-1.5 bg-black/20 rounded-lg", isFiring && "animate-pulse")}>
+                    <Zap className="w-5 h-5 fill-current" />
+                  </div>
+                  {isFiring ? 'EN VUELO' : numPieces > 1 ? `FUEGO DE BATERÍA (${numPieces})` : 'EJECUTAR FUEGO'}
+                </Button>
 
-      <Button
-        variant="outline"
-        onClick={onReport}
-        disabled={!targetPosition || isGeneratingReport}
-        className="flex-1 border-border bg-background text-muted-foreground hover:text-foreground hover:bg-secondary rounded-2xl font-black uppercase tracking-widest gap-2 h-12 text-[11px] transition-colors"
-      >
-        <FileText className="w-4 h-4" />
-        {isGeneratingReport ? 'COMPILANDO...' : 'GENERAR REPORTE'}
-      </Button>
-  </div>
-</div>
+                <Button
+                  variant="outline"
+                  onClick={onReport}
+                  disabled={!targetPosition || isGeneratingReport}
+                  className="flex-1 border-border bg-background text-muted-foreground hover:text-foreground hover:bg-secondary rounded-2xl font-black uppercase tracking-widest gap-2 h-12 text-[11px] transition-colors"
+                >
+                  <FileText className="w-4 h-4" />
+                  {isGeneratingReport ? 'COMPILANDO...' : 'GENERAR REPORTE'}
+                </Button>
+              </div>
+            </div>
           </div>
 
           {/* Panel de Detalles de Batería (Desplegable) */}
@@ -370,7 +495,7 @@ export function ControlPanel({
                       <div className="flex flex-col gap-1">
                         <div className="flex justify-between items-baseline">
                           <span className="text-[10px] font-mono font-bold text-muted-foreground">AZ</span>
-                          <span className="text-sm font-mono font-black text-foreground">{sol.azimuth + azOffset}</span>
+                          <span className="text-sm font-mono font-black text-foreground">{Math.round(sol.azimuth + azOffset)}</span>
                         </div>
                         <div className="flex justify-between items-baseline">
                           <span className="text-[10px] font-mono font-bold text-muted-foreground">EL</span>

@@ -15,7 +15,8 @@ import {
   Popup, 
   Polyline, 
   useMapEvents,
-  useMap 
+  useMap,
+  Rectangle
 } from 'react-leaflet';
 import L from 'leaflet';
 import 'leaflet/dist/leaflet.css';
@@ -34,6 +35,31 @@ interface TacticalMapProps {
   showExplosion?: boolean;
   fireProgress?: number;
   isGunLocated?: boolean;
+  mapModelBounds?: [LatLng, LatLng] | null;
+}
+
+// COMPONENTE PARA EL RECUADRO DEL MAPA MODELO
+function MapModelManager({ bounds }: { bounds: [LatLng, LatLng] | null }) {
+  const map = useMap();
+  
+  useEffect(() => {
+    if (bounds) {
+      map.fitBounds([
+        [bounds[0].lat, bounds[0].lng],
+        [bounds[1].lat, bounds[1].lng]
+      ], { padding: [50, 50], animate: true, duration: 1.5 });
+    }
+  }, [bounds, map]);
+
+  if (!bounds) return null;
+
+  // Renderizar el recuadro usando Leaflet
+  return (
+    <Rectangle 
+      bounds={[[bounds[0].lat, bounds[0].lng], [bounds[1].lat, bounds[1].lng]]} 
+      pathOptions={{ color: '#3B82F6', weight: 3, fillOpacity: 0, dashArray: '5, 5' }} 
+    />
+  );
 }
 
 // COMPONENTE DE MOVIMIENTO: Escucha la prop mapCenter del padre
@@ -128,7 +154,8 @@ export function TacticalMap({
   isFiring,
   showExplosion,
   fireProgress = 0,
-  isGunLocated
+  isGunLocated,
+  mapModelBounds
 }: TacticalMapProps) {
   const [gpsError, setGpsError] = useState<string | null>(null);
 
@@ -170,6 +197,8 @@ export function TacticalMap({
 
         {/* CORRECCIÓN: Ahora usa la prop mapCenter que viene del buscador */}
         <CenterManager center={mapCenter} />
+        
+        <MapModelManager bounds={mapModelBounds || null} />
 
         <MapEventsHandler 
           onSetTarget={onSetTarget} 

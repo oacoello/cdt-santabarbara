@@ -1,5 +1,18 @@
 # See https://help.github.com/articles/ignoring-files/ for more about ignoring files.
 
+# Ejecutables y compilados
+dist/
+out/
+build/
+*.exe
+
+# Dependencias
+node_modules/
+.venv/
+
+# Configuración local
+.env
+
 node_modules/
 dist/
 build/

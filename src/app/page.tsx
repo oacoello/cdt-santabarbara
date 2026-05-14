@@ -14,6 +14,7 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
+import { TacticalMapMapcn } from '@/components/TacticalMapMapcn';
 
 import { signIn, signOut, useSession } from "next-auth/react";
 import { SimulatorTab } from '@/components/fdc/SimulatorTab';
@@ -40,6 +41,7 @@ export default function SantaBarbaraFDC() {
   const [lastTrajectory, setLastTrajectory] = useState<{gun: LatLng, target: LatLng} | null>(null);
 
   const [mapCenter, setMapCenter] = useState<LatLng>({ lat: 14.0818, lng: -87.2068 });
+  const [mapModelBounds, setMapModelBounds] = useState<[LatLng, LatLng] | null>(null);
   const [isGunLocated, setIsGunLocated] = useState(false);
   const [isFiring, setIsFiring] = useState(false);
   const [fireProgress, setFireProgress] = useState(0);
@@ -120,6 +122,14 @@ export default function SantaBarbaraFDC() {
       setFireProgress(0);
       setShowExplosion(false);
     }
+  };
+
+  const handleDrawMapModel = (bounds: [LatLng, LatLng]) => {
+    setMapModelBounds(bounds);
+    // Centrar el mapa en el centro del rectángulo
+    const centerLat = (bounds[0].lat + bounds[1].lat) / 2;
+    const centerLng = (bounds[0].lng + bounds[1].lng) / 2;
+    setMapCenter({ lat: centerLat, lng: centerLng });
   };
 
   // Lógica de Autenticación
@@ -207,7 +217,7 @@ export default function SantaBarbaraFDC() {
               // NUEVA PROP: Pasamos la trayectoria guardada
               lastTrajectory={lastTrajectory}
               corrections={[]} handleAdjust={() => {}} handleFire={handleFire} handleGenerateReport={handleGenerateReport} 
-              realLatLng={null} handleAOCorrection={() => {}} 
+              realLatLng={null} handleAOCorrection={() => {}} onDrawMapModel={handleDrawMapModel} mapModelBounds={mapModelBounds}
             />
           </TabsContent>
 
