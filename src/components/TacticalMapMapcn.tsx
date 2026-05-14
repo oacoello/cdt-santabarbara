@@ -8,7 +8,7 @@ import { cn } from '@/lib/utils';
 import maplibregl from 'maplibre-gl';
 import 'maplibre-gl/dist/maplibre-gl.css';
 
-const MAPTILER_KEY = 'VRmMIQ93urJL9gK2BcI1'; 
+const MAPTILER_KEY = 'APIDELMAPA'; 
 const MAP_STYLE = `https://api.maptiler.com/maps/outdoor-v2-dark/style.json?key=${MAPTILER_KEY}`;
 
 interface TacticalMapProps {
