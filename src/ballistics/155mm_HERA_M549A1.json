@@ -1,0 +1,12 @@
+{
+    "name": "155mm HERA M549A1",
+    "caliber": 155.0,
+    "caliber_unit": "mm",
+    "mass": 43.5,
+    "drag_function": "G7",
+    "ballistic_coefficient": 0.89,
+    "charges": {
+        "RB M203": {"muzzle_velocity": 826.0, "max_range_km": 30}
+    },
+    "selected_charge": "RB M203"
+}

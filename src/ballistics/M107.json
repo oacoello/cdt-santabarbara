@@ -1,0 +1,20 @@
+{
+    "name": "M107 155mm HE",
+    "caliber": 155.0,
+    "caliber_unit": "mm",
+    "mass": 43.2,
+    "drag_function": "G1",
+    "ballistic_coefficient": 0.495,
+    "charges": {
+        "CHG 3G": {"muzzle_velocity": 305.0},
+        "CHG 4G": {"muzzle_velocity": 400.0},
+        "CHG 5G": {"muzzle_velocity": 500.0},
+        "CHG 3W": {"muzzle_velocity": 450.0},
+        "CHG 4W": {"muzzle_velocity": 520.0},
+        "CHG 5W": {"muzzle_velocity": 600.0},
+        "CHG 6W": {"muzzle_velocity": 684.0},
+        "CHG 7W": {"muzzle_velocity": 750.0},
+        "CHG 8": {"muzzle_velocity": 826.0}
+    },
+    "selected_charge": "CHG 6W"
+}

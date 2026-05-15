@@ -34,7 +34,7 @@ export const WEAPON_DATA = {
     charges: ['C1', 'C2', 'C3', 'C4', 'C5', 'C6', 'C7'],
     muzzleVelocities: [205, 230, 260, 300, 350, 410, 494],
     dragCoefficient: 0.25,
-    mass: 14.97, 
+    mass: 14.97,
     area: 0.0086,
   },
   'M198': {
@@ -56,7 +56,7 @@ const RHO = 1.225; // Densidad del aire al nivel del mar
 export function simulateTrajectoryRK4(elevMils: number, v0: number, weapon: WeaponSystem = 'M102') {
   const specs = WEAPON_DATA[weapon];
   const angleRad = (elevMils * Math.PI) / 3200;
-  
+
   let vx = v0 * Math.cos(angleRad);
   let vy = v0 * Math.sin(angleRad);
   let x = 0, y = 0, t = 0;
@@ -65,11 +65,11 @@ export function simulateTrajectoryRK4(elevMils: number, v0: number, weapon: Weap
 
   // Seguridad: Limitar a 300 segundos para evitar bucles infinitos
   while (y >= -0.5 && t < 300) {
-    points.push({ 
-      distance: x, 
-      altitude: Math.max(0, y), 
-      velocity: Math.sqrt(vx * vx + vy * vy), 
-      time: t 
+    points.push({
+      distance: x,
+      altitude: Math.max(0, y),
+      velocity: Math.sqrt(vx * vx + vy * vy),
+      time: t
     });
 
     const getAcc = (cvx: number, cvy: number) => {
@@ -83,23 +83,23 @@ export function simulateTrajectoryRK4(elevMils: number, v0: number, weapon: Weap
     };
 
     const k1 = getAcc(vx, vy);
-    const k2 = getAcc(vx + k1.ax * dt/2, vy + k1.ay * dt/2);
-    const k3 = getAcc(vx + k2.ax * dt/2, vy + k2.ay * dt/2);
+    const k2 = getAcc(vx + k1.ax * dt / 2, vy + k1.ay * dt / 2);
+    const k3 = getAcc(vx + k2.ax * dt / 2, vy + k2.ay * dt / 2);
     const k4 = getAcc(vx + k3.ax * dt, vy + k3.ay * dt);
 
-    vx += (dt/6) * (k1.ax + 2*k2.ax + 2*k3.ax + k4.ax);
-    vy += (dt/6) * (k1.ay + 2*k2.ay + 2*k3.ay + k4.ay);
-    
+    vx += (dt / 6) * (k1.ax + 2 * k2.ax + 2 * k3.ax + k4.ax);
+    vy += (dt / 6) * (k1.ay + 2 * k2.ay + 2 * k3.ay + k4.ay);
+
     x += vx * dt;
     y += vy * dt;
     t += dt;
   }
 
-  return { 
-    points, 
-    range: x, 
-    maxAlt: Math.max(...points.map(p => p.altitude)), 
-    tof: t 
+  return {
+    points,
+    range: x,
+    maxAlt: Math.max(...points.map(p => p.altitude)),
+    tof: t
   };
 }
 export const simulateTrajectory = simulateTrajectoryRK4;
@@ -107,10 +107,10 @@ export const simulateTrajectory = simulateTrajectoryRK4;
 /**
  * Encuentra la solución de tiro usando bisección para precisión milimétrica.
  */
-function findElevation(range: number, v0: number, weapon: WeaponSystem): {elevMils: number, timeOfFlight: number, maxOrdinate: number, impactVelocity: number} {
+function findElevation(range: number, v0: number, weapon: WeaponSystem): { elevMils: number, timeOfFlight: number, maxOrdinate: number, impactVelocity: number } {
   let low = 0, high = 1550; // Límites en MILs (0 a 87 grados aprox)
   let bestElev = 0;
-  
+
   // 15 iteraciones de bisección para encontrar el ángulo correcto
   for (let i = 0; i < 15; i++) {
     bestElev = (low + high) / 2;
@@ -120,7 +120,7 @@ function findElevation(range: number, v0: number, weapon: WeaponSystem): {elevMi
   }
 
   const finalSim = simulateTrajectoryRK4(bestElev, v0, weapon);
-  
+
   return {
     elevMils: Math.round(bestElev),
     timeOfFlight: Number(finalSim.tof.toFixed(1)),
@@ -131,11 +131,11 @@ function findElevation(range: number, v0: number, weapon: WeaponSystem): {elevMi
 
 export function computeFiringSolution(gunPosition: LatLng, targetPosition: LatLng, weapon: WeaponSystem, charge: string): FiringSolution {
   const range = calculateDistance(gunPosition.lat, gunPosition.lng, targetPosition.lat, targetPosition.lng);
-  
+
   // 1. Encontrar la carga recomendada (la mínima que alcance el rango)
   const specs = WEAPON_DATA[weapon];
   let recommendedCharge = specs.charges[specs.charges.length - 1]; // Por defecto la máxima
-  
+
   for (const c of specs.charges) {
     const testV0 = getMuzzleVelocity(weapon, c);
     // Aproximación: el rango máximo se alcanza cerca de los 800 MILs (45 grados)
@@ -148,9 +148,9 @@ export function computeFiringSolution(gunPosition: LatLng, targetPosition: LatLn
 
   const v0 = getMuzzleVelocity(weapon, charge);
   const azimuth = calculateAzimuth(gunPosition, targetPosition);
-  
+
   const elevationData = findElevation(range, v0, weapon);
-  
+
   return {
     range,
     azimuth,
@@ -173,8 +173,8 @@ export function calculateDistance(lat1: number, lng1: number, lat2: number, lng2
   const R = 6371e3;
   const dLat = (lat2 - lat1) * Math.PI / 180;
   const dLng = (lng2 - lng1) * Math.PI / 180;
-  const a = Math.sin(dLat/2)**2 + Math.cos(lat1*Math.PI/180)*Math.cos(lat2*Math.PI/180)*Math.sin(dLng/2)**2;
-  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+  const a = Math.sin(dLat / 2) ** 2 + Math.cos(lat1 * Math.PI / 180) * Math.cos(lat2 * Math.PI / 180) * Math.sin(dLng / 2) ** 2;
+  return R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
 }
 
 export function calculateAzimuth(start: LatLng, end: LatLng): number {
@@ -208,7 +208,7 @@ export function getPreciseMilitaryData(coord: LatLng): MilitaryData {
   const CM = -87; // Meridiano central de Honduras
   const easting = 500000 + (coord.lng - CM) * 111320 * Math.cos(coord.lat * Math.PI / 180);
   const northing = coord.lat * 111320;
-  
+
   // Altitud simulada para Comayagua/Santa Bárbara
   const altitude = Math.round(150 + Math.abs(Math.sin(coord.lat * 100) * 800));
 
@@ -231,10 +231,10 @@ export function calculateOTCorrection(target: LatLng, otAzimuthMils: number, lr:
   const dx_ot = Math.sin(otRad);
   const dy_perp = -Math.sin(otRad);
   const dx_perp = Math.cos(otRad);
-  
+
   const totalDx = (dx_ot * ad) + (dx_perp * lr);
   const totalDy = (dy_ot * ad) + (dy_perp * lr);
-  
+
   return {
     lat: target.lat + (totalDy / 111320),
     lng: target.lng + (totalDx / (111320 * Math.cos(target.lat * Math.PI / 180)))

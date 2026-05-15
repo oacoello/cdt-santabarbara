@@ -1,0 +1,20 @@
+{
+    "name": "155mm HE RAAM LM718A1",
+    "caliber": 155.0,
+    "caliber_unit": "mm",
+    "mass": 46.7,
+    "drag_function": "G1",
+    "ballistic_coefficient": 0.52,
+    "charges": {
+        "CHG 3G": {"muzzle_velocity": 295.0},
+        "CHG 4G": {"muzzle_velocity": 390.0},
+        "CHG 5G": {"muzzle_velocity": 490.0},
+        "CHG 3W": {"muzzle_velocity": 440.0},
+        "CHG 4W": {"muzzle_velocity": 510.0},
+        "CHG 5W": {"muzzle_velocity": 590.0},
+        "CHG 6W": {"muzzle_velocity": 670.0},
+        "CHG 7W": {"muzzle_velocity": 740.0},
+        "CHG 8": {"muzzle_velocity": 810.0}
+    },
+    "selected_charge": "CHG 6W"
+}
