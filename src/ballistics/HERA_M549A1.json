@@ -1,0 +1,12 @@
+{
+    "name": "HERA M549A1 155mm",
+    "caliber": 155.0,
+    "caliber_unit": "mm",
+    "mass": 43.5,
+    "drag_function": "G7",
+    "ballistic_coefficient": 0.89,
+    "charges": {
+        "CHG 8": {"muzzle_velocity": 826.0}
+    },
+    "selected_charge": "CHG 8"
+}

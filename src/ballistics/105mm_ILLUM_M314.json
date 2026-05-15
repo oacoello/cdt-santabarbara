@@ -1,0 +1,19 @@
+{
+    "name": "105mm ILLUM M314",
+    "caliber": 105.0,
+    "caliber_unit": "mm",
+    "mass": 15.2,
+    "drag_function": "G1",
+    "ballistic_coefficient": 0.38,
+    "charges": {
+        "CHG 3G": {"muzzle_velocity": 290.0},
+        "CHG 4G": {"muzzle_velocity": 380.0},
+        "CHG 5G": {"muzzle_velocity": 480.0},
+        "CHG 3W": {"muzzle_velocity": 450.0},
+        "CHG 4W": {"muzzle_velocity": 520.0},
+        "CHG 5W": {"muzzle_velocity": 610.0},
+        "CHG 6W": {"muzzle_velocity": 700.0},
+        "CHG 7W": {"muzzle_velocity": 790.0}
+    },
+    "selected_charge": "CHG 7W"
+}

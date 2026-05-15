@@ -1,0 +1,18 @@
+{
+    "M119": {
+        "caliber": 105,
+        "compatible_projectiles": ["105mm HE M1", "105mm ILLUM M314", "105mm SMOKE HC"]
+    },
+    "M777": {
+        "caliber": 155,
+        "compatible_projectiles": ["M107 155mm HE", "155mm HE M106", "155mm HE RAAM LM718A1", "155mm ILLUM M485", "155mm HERA M549A1"]
+    },
+    "M109A6": {
+        "caliber": 155,
+        "compatible_projectiles": ["M107 155mm HE", "155mm HE M106", "155mm HERA M549A1"]
+    },
+    "M198": {
+        "caliber": 155,
+        "compatible_projectiles": ["M107 155mm HE", "155mm HE M106", "155mm ILLUM M485"]
+    }
+}

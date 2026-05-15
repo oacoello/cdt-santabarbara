@@ -1,0 +1,19 @@
+{
+    "name": "155mm ILLUM M485",
+    "caliber": 155.0,
+    "caliber_unit": "mm",
+    "mass": 42.0,
+    "drag_function": "G1",
+    "ballistic_coefficient": 0.46,
+    "charges": {
+        "CHG 3G": {"muzzle_velocity": 310.0},
+        "CHG 4G": {"muzzle_velocity": 405.0},
+        "CHG 5G": {"muzzle_velocity": 505.0},
+        "CHG 3W": {"muzzle_velocity": 455.0},
+        "CHG 4W": {"muzzle_velocity": 525.0},
+        "CHG 5W": {"muzzle_velocity": 605.0},
+        "CHG 6W": {"muzzle_velocity": 690.0},
+        "CHG 7W": {"muzzle_velocity": 755.0}
+    },
+    "selected_charge": "CHG 6W"
+}

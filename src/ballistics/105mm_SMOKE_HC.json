@@ -1,0 +1,19 @@
+{
+    "name": "105mm SMOKE HC",
+    "caliber": 105.0,
+    "caliber_unit": "mm",
+    "mass": 15.5,
+    "drag_function": "G1",
+    "ballistic_coefficient": 0.36,
+    "charges": {
+        "CHG 3G": {"muzzle_velocity": 285.0},
+        "CHG 4G": {"muzzle_velocity": 375.0},
+        "CHG 5G": {"muzzle_velocity": 475.0},
+        "CHG 3W": {"muzzle_velocity": 440.0},
+        "CHG 4W": {"muzzle_velocity": 510.0},
+        "CHG 5W": {"muzzle_velocity": 600.0},
+        "CHG 6W": {"muzzle_velocity": 690.0},
+        "CHG 7W": {"muzzle_velocity": 780.0}
+    },
+    "selected_charge": "CHG 7W"
+}
