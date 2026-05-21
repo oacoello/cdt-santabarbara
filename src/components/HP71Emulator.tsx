@@ -66,18 +66,26 @@ const CalcKey: React.FC<KeyProps> = ({
 };
 
 // ---------- Utilidad: detectar piezas en la respuesta ----------
-function parsePieces(text: string): string[] {
+type PieceResult = {
+  number: number;
+  text: string;
+};
+
+function parsePieces(text: string): PieceResult[] {
   const lines = text.split(/\r?\n/);
-  const result: string[] = [];
+  const result: PieceResult[] = [];
   let current: string[] = [];
+  let currentNumber: number | null = null;
 
   for (const line of lines) {
     const clean = line.trim();
+    const pieceMatch = clean.match(/^-+\s*PIECE\s+(\d+)\s*-+$/i);
 
-    if (clean.includes("PIECE") && clean.includes("-----")) {
-      if (current.length > 0) {
-        result.push(current.join("\n"));
+    if (pieceMatch) {
+      if (current.length > 0 && currentNumber !== null) {
+        result.push({ number: currentNumber, text: current.join("\n") });
       }
+      currentNumber = parseInt(pieceMatch[1], 10);
       current = [clean];
       continue;
     }
@@ -88,7 +96,10 @@ function parsePieces(text: string): string[] {
     }
   }
 
-  if (current.length > 0) result.push(current.join("\n"));
+  if (current.length > 0 && currentNumber !== null) {
+    result.push({ number: currentNumber, text: current.join("\n") });
+  }
+
   return result;
 }
 
@@ -100,7 +111,7 @@ export default function HP71Emulator() {
   const [promptVisible, setPromptVisible] = useState(false);
 
   // Estado de navegación de piezas
-  const [pieces, setPieces] = useState<string[]>([]);
+  const [pieces, setPieces] = useState<PieceResult[]>([]);
   const [pieceIndex, setPieceIndex] = useState(0);
   const [pieceMode, setPieceMode] = useState(false);
 
@@ -134,17 +145,19 @@ export default function HP71Emulator() {
   }, []);
 
   // ---------- Envío de comandos al servidor ----------
-  const sendCommand = useCallback(async (command: string) => {
+  const sendCommand = useCallback(async (command: string, preferredBasePieceNumber = basePieceNumber) => {
     if (!command.trim() || loading) return;
     setLoading(true);
     try {
       const res = await fetch(`/api/hp71?cmd=${encodeURIComponent(command)}`, { method: "POST" });
       const json = await res.json();
       const responseText: string = json.display || "";
+      let nextBasePieceNumber = preferredBasePieceNumber;
 
       // Lógica nueva para pieza base
       const basePiece = extractBasePiece(responseText);
       if (basePiece !== null) {
+        nextBasePieceNumber = basePiece;
         setBasePieceNumber(basePiece);
         setWaitingBasePiece(true);
       }
@@ -171,10 +184,12 @@ export default function HP71Emulator() {
       const foundPieces = parsePieces(responseText);
       if (foundPieces.length > 0) {
         setPieces(foundPieces);
-        setPieceIndex(Math.max(0, Math.min(basePieceNumber - 1, foundPieces.length - 1)));
+        const selectedIndex = foundPieces.findIndex((piece) => piece.number === nextBasePieceNumber);
+        setPieceIndex(selectedIndex >= 0 ? selectedIndex : 0);
         setPieceMode(true);
         setPromptVisible(false);
       } else {
+        setPieces([]);
         setPieceMode(false);
         setScreenText(responseText + "\n> ");
         setPromptVisible(true);
@@ -186,7 +201,7 @@ export default function HP71Emulator() {
     } finally {
       setLoading(false);
     }
-  }, [basePieceNumber]);
+  }, [basePieceNumber, loading]);
 
   // ---------- Manejo unificado de teclas ----------
     const handleKeyPress = useCallback(
@@ -219,13 +234,16 @@ export default function HP71Emulator() {
 
       // Tecla ENTER → envía el comando acumulado o "MAIN"
       if (key === "ENTER") {
-        const cmd = buffer.trim() === "" ? "MAIN" : buffer.trim();
+        const cmd = buffer.trim();
+        if (cmd === "") return;
+        let preferredBasePieceNumber = basePieceNumber;
         if (waitingBasePiece && /^\d+$/.test(cmd) && parseInt(cmd, 10) > 0) {
-          setBasePieceNumber(parseInt(cmd, 10));
+          preferredBasePieceNumber = parseInt(cmd, 10);
+          setBasePieceNumber(preferredBasePieceNumber);
           setWaitingBasePiece(false);
         }
         setBuffer("");
-        sendCommand(cmd);
+        sendCommand(cmd, preferredBasePieceNumber);
         logEvent('INPUT', `USUARIO: ${cmd}`);
         return;
       }
@@ -259,7 +277,8 @@ export default function HP71Emulator() {
 
       // Tecla normal (se añade al buffer sin registrar)
       if ((key === "P" || key === "Y" || key === "N") && pieces.length > 0) {
-        setPieceIndex(Math.max(0, Math.min(basePieceNumber - 1, pieces.length - 1)));
+        const selectedIndex = pieces.findIndex((piece) => piece.number === basePieceNumber);
+        setPieceIndex(selectedIndex >= 0 ? selectedIndex : 0);
       }
       setBuffer((prev) => prev + key.toUpperCase());
     },
@@ -288,10 +307,8 @@ export default function HP71Emulator() {
   }, [handleKeyPress]);
 
   // ---------- Contenido del LCD ----------
-  const lcdContent = loading
-    ? "BUSCANDO..."
-    : pieceMode && pieces.length > 0
-    ? `${pieces[pieceIndex]}\n\nPIECE ${pieceIndex + 1}/${pieces.length}\n← → flechas para mover`
+  const lcdContent = pieceMode && pieces.length > 0
+    ? pieces[pieceIndex]?.text ?? ""
     : promptVisible
     ? screenText + buffer
     : screenText;
@@ -312,9 +329,9 @@ export default function HP71Emulator() {
           <div className="bg-gradient-to-r from-[#d9c7a0] via-[#ae986d] to-[#d9c7a0] px-[32px] py-[4px] rounded shadow-[inset_1px_1px_3px_rgba(0,0,0,0.4)] border border-[#c4a96c]">
             <div className="relative bg-[#8b967d] w-[540px] h-24 p-4 shadow-[inset_4px_4px_12px_rgba(0,0,0,0.6)] border-2 border-[#7a856c] flex items-center overflow-hidden">
               <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-white/10 pointer-events-none" />
-              <div className="relative z-10 font-mono text-[#1a1a1a] text-2xl font-bold flex items-center w-full overflow-x-auto whitespace-nowrap scrollbar-hide">
+              <div className="relative z-10 font-mono text-[#1a1a1a] text-xl font-bold w-full h-full overflow-auto whitespace-pre-wrap leading-tight scrollbar-hide">
                 {lcdContent}
-                <span className="w-3 h-7 bg-[#1a1a1a]/80 ml-1 flex-shrink-0 animate-pulse" />
+                <span className={`inline-block w-3 h-6 bg-[#1a1a1a]/80 ml-1 align-middle ${loading ? "animate-pulse" : ""}`} />
               </div>
             </div>
           </div>
