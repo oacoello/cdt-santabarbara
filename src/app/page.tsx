@@ -19,7 +19,7 @@ import { TacticalMapMapcn } from '@/components/TacticalMapMapcn';
 import { signIn, signOut, useSession } from "next-auth/react";
 import { SimulatorTab } from '@/components/fdc/SimulatorTab';
 import { ReportDialog } from '@/components/ReportDialog';
-import { computeFiringSolution } from '@/lib/ballistics';
+import { computeFiringSolution, getMuzzleVelocity, simulateTrajectory } from '@/lib/ballistics';
 import HP71Emulator from '@/components/HP71Emulator';
 
 export default function SantaBarbaraFDC() {
@@ -36,7 +36,7 @@ export default function SantaBarbaraFDC() {
   // Estados de balística
   const [gunPosition, setGunPosition] = useState<LatLng | null>(null);
   const [targetPosition, setTargetPosition] = useState<LatLng | null>(null);
-  
+
   // NUEVO: Estado para persistir la última trayectoria disparada
   const [lastTrajectory, setLastTrajectory] = useState<{gun: LatLng, target: LatLng} | null>(null);
 
@@ -53,19 +53,19 @@ export default function SantaBarbaraFDC() {
   const [isReportOpen, setIsReportOpen] = useState(false);
   const [activeReport, setActiveReport] = useState<any>(null);
 
-  // Función para generar reporte
-  const handleGenerateReport = () => {
-    if (!gunPosition || !targetPosition) return;
-    
+  const buildMissionReport = () => {
+    if (!gunPosition || !targetPosition) return null;
+
     const solution = computeFiringSolution(gunPosition, targetPosition, weapon, charge);
-    
-    const reportData = {
+    const v0 = getMuzzleVelocity(weapon, charge);
+    const trajectory = simulateTrajectory(solution.elevMils, v0, weapon).points;
+
+    return {
       id: `RPT-${Date.now()}`,
       timestamp: new Date().toISOString(),
       classification: 'SECRET//NOFORN',
       solution,
-      manualSolution: solution,
-      trajectory: [],
+      trajectory,
       weapon,
       charge,
       targetUTM: `${targetPosition.lat.toFixed(6)}, ${targetPosition.lng.toFixed(6)}`,
@@ -73,10 +73,14 @@ export default function SantaBarbaraFDC() {
       targetAlt: '0',
       impactDamage: 0,
       corrections: [],
-      range: solution.range.toFixed(0),
-      maxOrd: solution.maxOrdinate.toFixed(0),
     };
-    
+  };
+
+  // Función para generar reporte
+  const handleGenerateReport = () => {
+    const reportData = buildMissionReport();
+    if (!reportData) return;
+
     setActiveReport(reportData);
     setIsReportOpen(true);
   };
@@ -89,12 +93,12 @@ export default function SantaBarbaraFDC() {
           const next = prev + 5;
           if (next >= 100) {
             setShowExplosion(true);
-            
+
             // CAMBIO: Guardamos la trayectoria justo al completar el disparo
             if (gunPosition && targetPosition) {
               setLastTrajectory({ gun: gunPosition, target: targetPosition });
             }
-            
+
             return 100;
           }
           return next;
@@ -136,7 +140,7 @@ export default function SantaBarbaraFDC() {
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsAuthenticating(true);
-    
+
     try {
       const result = await signIn("credentials", {
         username: loginUsername,
@@ -165,35 +169,35 @@ export default function SantaBarbaraFDC() {
 
   return (
     <main className="relative flex flex-col h-[100dvh] w-full overflow-hidden bg-transparent font-['Stack_Sans_Text']">
-      
+
       {/* CAPA 0: FONDO TÁCTICO FIJO */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <TacticalBackground />
       </div>
 
       <Tabs value={activeTab} onValueChange={setActiveTab} className="relative z-10 w-full h-full flex flex-col bg-transparent">
-        
+
         {/* CAPA 1: HEADER TRASLÚCIDO */}
         <header className="flex-none h-[3.25rem] border-b border-white/10 px-4 flex items-center gap-6 bg-black/20 backdrop-blur-sm">
           <div className="flex-none py-2">
             <img src="/logosbcdt.png" alt="Logo" className="h-8 w-auto object-contain" />
           </div>
-          
+
           <TabsList className="bg-transparent h-full gap-2">
-            <TabsTrigger 
-              value="sim" 
+            <TabsTrigger
+              value="sim"
               className="px-6 uppercase text-[11px] font-black tracking-[0.2em] h-full transition-all data-[state=active]:text-[#F39C63]"
             >
               <span className="material-symbols-rounded text-sm mr-2">target</span> Simulador
             </TabsTrigger>
-            <TabsTrigger 
-              value="manual" 
+            <TabsTrigger
+              value="manual"
               className="px-6 uppercase text-[11px] font-black tracking-[0.2em] h-full transition-all data-[state=active]:text-[#F39C63]"
             >
               <span className="material-symbols-rounded text-sm mr-2">calculate</span> Calculadora
             </TabsTrigger>
-            <TabsTrigger 
-              value="staff" 
+            <TabsTrigger
+              value="staff"
               className="px-6 uppercase text-[11px] font-black tracking-[0.2em] h-full transition-all data-[state=active]:text-[#F39C63]"
             >
               <span className="material-symbols-rounded text-sm mr-2">badge</span> {loggedUser ? 'Operador' : 'Acceso'}
@@ -203,20 +207,20 @@ export default function SantaBarbaraFDC() {
 
         {/* CAPA 2: CONTENIDO PRINCIPAL */}
         <div className="flex-1 relative overflow-hidden bg-transparent">
-          
+
           {/* SIMULADOR */}
           <TabsContent value="sim" forceMount className="h-full w-full m-0 p-0 border-none bg-transparent data-[state=inactive]:hidden">
-            <SimulatorTab 
-              gunPosition={gunPosition} targetPosition={targetPosition} mapCenter={mapCenter} setMapCenter={setMapCenter} 
+            <SimulatorTab
+              gunPosition={gunPosition} targetPosition={targetPosition} mapCenter={mapCenter} setMapCenter={setMapCenter}
               isGunLocated={isGunLocated} weapon={weapon} charge={charge} numPieces={numPieces} setNumPieces={setNumPieces as any}
               beamType={beamType} setBeamType={setBeamType as any} setWeapon={setWeapon as any} setCharge={setCharge}
               // MODIFICACIÓN: Al cambiar target o gun, limpiamos lastTrajectory
-              handleSetTarget={(coord) => { setTargetPosition(coord); setLastTrajectory(null); }} 
-              handleSetGun={(coord) => { setGunPosition(coord); setIsGunLocated(true); setLastTrajectory(null); }} 
+              handleSetTarget={(coord) => { setTargetPosition(coord); setLastTrajectory(null); }}
+              handleSetGun={(coord) => { setGunPosition(coord); setIsGunLocated(true); setLastTrajectory(null); }}
               impacts={[]} isFiring={isFiring} showExplosion={showExplosion} fireProgress={fireProgress}
               // NUEVA PROP: Pasamos la trayectoria guardada
               lastTrajectory={lastTrajectory}
-              corrections={[]} handleAdjust={() => {}} handleFire={handleFire} handleGenerateReport={handleGenerateReport} 
+              corrections={[]} handleAdjust={() => {}} handleFire={handleFire} handleGenerateReport={handleGenerateReport}
               realLatLng={null} handleAOCorrection={() => {}} onDrawMapModel={handleDrawMapModel} mapModelBounds={mapModelBounds}
             />
           </TabsContent>
@@ -235,33 +239,33 @@ export default function SantaBarbaraFDC() {
                     <h2 className="text-xs font-black uppercase tracking-[0.3em] text-[#F39C63]">Fire Control Unit</h2>
                     <p className="text-[10px] text-white/40 uppercase">Autenticación de Terminal</p>
                   </div>
-                  
+
                   <div className="space-y-4">
                     <div className="space-y-1">
                       <Label className="text-[9px] uppercase font-bold text-white/50 ml-1">ID de Operador</Label>
-                      <Input 
-                        value={loginUsername} 
-                        onChange={(e) => setLoginUsername(e.target.value)} 
-                        placeholder="USER_ID" 
-                        className="bg-white/5 border-white/10 h-12 text-white focus:border-[#F39C63] transition-colors" 
-                        required 
+                      <Input
+                        value={loginUsername}
+                        onChange={(e) => setLoginUsername(e.target.value)}
+                        placeholder="USER_ID"
+                        className="bg-white/5 border-white/10 h-12 text-white focus:border-[#F39C63] transition-colors"
+                        required
                       />
                     </div>
                     <div className="space-y-1">
                       <Label className="text-[9px] uppercase font-bold text-white/50 ml-1">Código de Seguridad</Label>
-                      <Input 
-                        type="password" 
-                        value={loginPassword} 
-                        onChange={(e) => setLoginPassword(e.target.value)} 
-                        placeholder="••••••••" 
-                        className="bg-white/5 border-white/10 h-12 text-white focus:border-[#F39C63] transition-colors" 
-                        required 
+                      <Input
+                        type="password"
+                        value={loginPassword}
+                        onChange={(e) => setLoginPassword(e.target.value)}
+                        placeholder="••••••••"
+                        className="bg-white/5 border-white/10 h-12 text-white focus:border-[#F39C63] transition-colors"
+                        required
                       />
                     </div>
                   </div>
-                  
-                  <Button 
-                    type="submit" 
+
+                  <Button
+                    type="submit"
                     disabled={isAuthenticating}
                     className="w-full bg-[#F39C63] hover:bg-[#F39C63]/90 text-black font-black uppercase h-12 tracking-widest"
                   >
@@ -280,7 +284,7 @@ export default function SantaBarbaraFDC() {
                       Online
                     </div>
                   </div>
-                  
+
                   <div className="space-y-1">
                     <div className="text-xl font-black uppercase text-white tracking-tight">{loggedUser.name}</div>
                     <div className="text-[10px] text-[#F39C63] font-bold uppercase tracking-widest opacity-70">
@@ -299,9 +303,9 @@ export default function SantaBarbaraFDC() {
                      </div>
                   </div>
 
-                  <Button 
-                    onClick={() => signOut()} 
-                    variant="outline" 
+                  <Button
+                    onClick={() => signOut()}
+                    variant="outline"
                     className="w-full border-red-500/30 text-red-500 hover:bg-red-500/10 font-black uppercase h-11 tracking-widest transition-all"
                   >
                     Desvincular
@@ -313,10 +317,10 @@ export default function SantaBarbaraFDC() {
         </div>
       </Tabs>
       <Toaster />
-      <ReportDialog 
-        isOpen={isReportOpen} 
-        report={activeReport} 
-        onClose={() => setIsReportOpen(false)} 
+      <ReportDialog
+        isOpen={isReportOpen}
+        data={activeReport}
+        onClose={() => setIsReportOpen(false)}
       />
     </main>
   );

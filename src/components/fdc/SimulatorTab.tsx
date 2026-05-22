@@ -11,15 +11,12 @@ import { ControlPanel } from "@/components/ControlPanel";
 import {
   type LatLng,
   type WeaponSystem,
-  simulateTrajectory,
   getPreciseMilitaryData,
   calculateDistance,
-  getMuzzleVelocity,
 } from "@/lib/ballistics";
 import { AdvancedObserver } from "./AdvancedObserver";
 import { utmToLatLon } from '@/lib/coordinates'; // Importación de tu nueva utilidad[cite: 8]
 import { MeteorologyPanel } from "./MeteorologyPanel";
-import { TrajectoryChart } from "./TrajectoryChart";
 import { cn } from "@/lib/utils";
 
 interface SimulatorTabProps {
@@ -229,13 +226,6 @@ export function SimulatorTab({
             />
           </div>
 
-          {(isFiring || impacts.length > 0) && (
-            <TrajectoryChart
-              range={gunPosition && targetPosition ? calculateDistance(gunPosition.lat, gunPosition.lng, targetPosition.lat, targetPosition.lng) : 0}
-              muzzleVelocity={getMuzzleVelocity(weapon, charge)}
-              weapon={weapon}
-            />
-          )}
         </div>
 
         {/* Panel Derecho */}

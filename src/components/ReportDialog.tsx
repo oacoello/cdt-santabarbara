@@ -6,15 +6,12 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FileText, ArrowRightLeft, ClipboardList } from 'lucide-react';
+import { FileText, ArrowRightLeft, ClipboardList, ShieldAlert, X } from 'lucide-react';
 import { type TrajectoryPoint, type FiringSolution } from '@/lib/ballistics';
-// Importación corregida con XAxis y YAxis para resolver errores ts(2304)[cite: 3, 4]
 import { 
   AreaChart, 
   Area, 
@@ -23,21 +20,28 @@ import {
   XAxis, 
   YAxis 
 } from 'recharts';
+import { cn } from '@/lib/utils';
 
-const SALMON_COLOR = "#F39C63";
+const BLUE_COLOR = "#38BDF8";
 
-interface ManualResult {
-  alcance: number;
-  elevacion: number;
-  tof: number;
+export interface MilitaryBallisticData {
+  pieza: number | string;
+  distancia: number;     
+  azimut: number;        
+  elevacion: number;     
+  tiempoVuelo: number;   
+  carga: string;
+  proyectil: string;
+  coordenadasPieza?: { x: number; y: number; alt: number };
+  coordenadasObjetivo?: { x: number; y: number; alt: number };
 }
 
 interface MissionReportData {
   id: string;
   timestamp: string;
   classification: string;
-  solution: FiringSolution;
-  manualSolution: FiringSolution;
+  solution: FiringSolution;          
+  hp71Solution?: MilitaryBallisticData; 
   trajectory: TrajectoryPoint[];
   weapon: string;
   charge: string;
@@ -46,180 +50,261 @@ interface MissionReportData {
   targetAlt: string;
   impactDamage: number;
   corrections: string[];
-  range: string;
-  maxOrd: string;
-  observerId?: string;
-  targetNumber?: string;
-  missionType?: string;
-  ammoLot?: string;
-  metTemp?: number;
-  metWindSpeed?: number;
-  verticalInterval?: number;
-  timeReceived?: string;
-  timeFired?: string;
 }
 
-export function ReportDialog({ report, isOpen, onClose, manualResults = [] }: { report: MissionReportData | null, isOpen: boolean, onClose: () => void, manualResults?: ManualResult[] }) {
-  if (!report) return null;
+interface ReportDialogProps {
+  isOpen: boolean;
+  onClose: () => void;
+  data: MissionReportData | null;
+}
+
+export function ReportDialog({ isOpen, onClose, data }: ReportDialogProps) {
+  if (!data) return null;
+
+  const getDelta = (valSim: number | undefined, valHP: number | undefined, isInteger = true) => {
+    if (valSim === undefined || valHP === undefined) return { txt: 'N/A', isCritical: false };
+    const diff = valHP - valSim;
+    const absDiff = Math.abs(diff);
+    
+    const isCritical = isInteger ? absDiff > 5 : absDiff > 1.5;
+    
+    return {
+      txt: diff === 0 ? '0' : `${diff > 0 ? '+' : ''}${diff.toFixed(isInteger ? 0 : 1)}`,
+      isCritical
+    };
+  };
+
+  const deltaDist = getDelta(data.solution.range, data.hp71Solution?.distancia, true);
+  const deltaAzimut = getDelta(data.solution.azimuth, data.hp71Solution?.azimut, true);
+  const deltaElev = getDelta(data.solution.elevMils, data.hp71Solution?.elevacion, true);
+  const deltaTiempo = getDelta(data.solution.timeOfFlight, data.hp71Solution?.tiempoVuelo, false);
+
+  const hasCriticalDeviation = deltaElev.isCritical || deltaAzimut.isCritical;
+  const trajectory = data.trajectory || [];
+  const impactPoint = trajectory[trajectory.length - 1];
+  const maxAltitude = trajectory.reduce((max, point) => Math.max(max, point.altitude), 0);
+  const finalVelocity = impactPoint?.velocity ?? data.solution.impactVelocity ?? 0;
+  const machFinal = finalVelocity / 343;
 
   return (
-    <Dialog open={isOpen} onOpenChange={(open) => { if (!open) onClose(); }}>
-      <DialogContent 
-        className="sm:max-w-[850px] max-h-[90vh] overflow-y-auto bg-black/40 backdrop-blur-xl border-2 border-[#F39C63] p-6 shadow-[0_0_50px_rgba(243,156,99,0.15)] z-[5000] rounded-2xl"
-        onPointerDownOutside={(e) => e.preventDefault()}
-      >
-        <DialogHeader>
-          <div className="flex items-center justify-between mb-4">
-            <div className="flex items-center gap-3">
-              <div className="p-2.5 bg-[#F39C63]/20 rounded-xl border border-[#F39C63]/30">
-                <FileText className="w-7 h-7 text-[#F39C63]" />
-              </div>
-              <div>
-                <DialogTitle className="text-2xl font-black uppercase tracking-tighter text-white">
-                  INFORME
-                </DialogTitle>
-              </div>
+    <Dialog open={isOpen} onOpenChange={onClose}>
+      <DialogContent className="w-[83vw] max-w-[83vw] h-[83vh] max-h-[83vh] gap-0 flex flex-col bg-black/95 text-white border border-[#38BDF8]/20 backdrop-blur-2xl rounded-2xl shadow-[0_0_50px_rgba(56,189,248,0.12)] overflow-hidden p-2 sm:p-3">
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Cerrar reporte"
+          className="absolute right-4 top-4 z-50 rounded-md p-1 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+        >
+          <X className="h-5 w-5" />
+        </button>
+        
+        <DialogHeader className="relative z-10 flex-none">
+          <div className="flex items-center gap-3">
+            <div className="p-2 bg-[#F39C63]/10 rounded-xl border border-[#F39C63]/30">
+              <FileText className="w-5 h-5 text-[#F39C63]" />
             </div>
-            <div className="text-right">
-              <span className="text-[10px] font-mono text-white/40 block uppercase">ID MISIÓN</span>
-              <span className="text-sm font-black text-[#F39C63]">{report.id}</span>
+            <div>
+              <div className="flex items-center gap-2">
+                <span className="text-[9px] font-black tracking-[0.3em] bg-red-900/40 text-red-400 px-2 py-0.5 rounded border border-red-950">
+                  {data.classification}
+                </span>
+                <span className="text-[10px] font-mono text-white/40">{data.timestamp}</span>
+              </div>
+              <DialogTitle className="text-lg font-black tracking-wider uppercase text-white mt-1">
+                Informe Computarizado del Récord de Tiro
+              </DialogTitle>
             </div>
           </div>
         </DialogHeader>
 
-        <Tabs defaultValue="overview" className="w-full">
-          <TabsList className="bg-transparent w-full justify-start gap-4 mb-8 p-0 h-auto border-none">
-            <TabsTrigger value="overview" className="uppercase font-black text-xs h-14 px-8 rounded-2xl border-2 border-[#7c4a3a] bg-black/40 text-gray-400 data-[state=active]:bg-[#F39C63] data-[state=active]:text-black transition-all tracking-widest">
-              RESUMEN
+        <Tabs defaultValue="comparison" className="w-full mt-8 relative z-10 flex-1 min-h-0 flex flex-col">
+          <TabsList className="bg-black/60 border border-[#F39C63]/10 p-1 rounded-xl w-full grid grid-cols-3 flex-none">
+            <TabsTrigger value="comparison" className="data-[state=active]:bg-[#F39C63] data-[state=active]:text-black text-xs font-black uppercase tracking-wider rounded-lg transition-all">
+              <ArrowRightLeft className="w-3.5 h-3.5 mr-1.5" /> Mapeo y Comparación HP-71B
             </TabsTrigger>
-            <TabsTrigger value="comparison" className="uppercase font-black text-xs h-14 px-8 rounded-2xl border-2 border-[#7c4a3a] bg-black/40 text-gray-400 data-[state=active]:bg-[#F39C63] data-[state=active]:text-black transition-all tracking-widest flex gap-2">
-              <ArrowRightLeft className="w-4 h-4" /> COMPARATIVA
+            <TabsTrigger value="trajectory" className="data-[state=active]:bg-[#F39C63] data-[state=active]:text-black text-xs font-black uppercase tracking-wider rounded-lg transition-all">
+              <ClipboardList className="w-3.5 h-3.5 mr-1.5" /> Gráfico de Trayectoria
             </TabsTrigger>
-            <TabsTrigger value="doctrinal" className="uppercase font-black text-xs h-14 px-8 rounded-2xl border-2 border-[#7c4a3a] bg-black/40 text-gray-400 data-[state=active]:bg-[#F39C63] data-[state=active]:text-black transition-all tracking-widest flex gap-2">
-              <ClipboardList className="w-4 h-4" /> DA 4504
+            <TabsTrigger value="telemetry" className="data-[state=active]:bg-[#F39C63] data-[state=active]:text-black text-xs font-black uppercase tracking-wider rounded-lg transition-all">
+              <FileText className="w-3.5 h-3.5 mr-1.5" /> Datos de Misión
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="overview" className="space-y-6 animate-in fade-in duration-500 outline-none">
-            <div className="bg-black/40 rounded-2xl border border-[#F39C63]/20 p-6 h-64 shadow-inner backdrop-blur-sm relative">
-              <div className="absolute top-4 left-6 z-10">
-                <span className="text-[10px] font-black text-[#F39C63]/60 uppercase tracking-widest">
-                  Perfil Balístico Real (RK4 + Drag)
-                </span>
-              </div>
-              
-              <ResponsiveContainer width="100%" height="100%">
-                <AreaChart data={report.trajectory} margin={{ top: 20, right: 10, left: -20, bottom: 0 }}>
-                  <defs>
-                    <linearGradient id="colorAltReport" x1="0" y1="0" x2="0" y2="1">
-                      <stop offset="5%" stopColor={SALMON_COLOR} stopOpacity={0.4}/>
-                      <stop offset="95%" stopColor={SALMON_COLOR} stopOpacity={0}/>
-                    </linearGradient>
-                  </defs>
+          <TabsContent value="comparison" className="mt-4 space-y-3 outline-none flex-1 min-h-0 overflow-hidden">
+            <div className="border border-[#F39C63]/10 rounded-2xl overflow-hidden bg-black/40 backdrop-blur-sm">
+              <Table>
+                <TableHeader className="bg-[#F39C63]/5">
+                  <TableRow className="border-b border-[#F39C63]/10 hover:bg-transparent">
+                    <TableHead className="text-white/60 font-black uppercase text-[10px] tracking-wider py-4">Parámetro (Récord de Tiro)</TableHead>
+                    <TableHead className="text-[#F39C63] font-black uppercase text-[10px] tracking-wider text-center">Terminal HP-71B</TableHead>
+                    <TableHead className="text-blue-400 font-black uppercase text-[10px] tracking-wider text-center">Simulador Tab (RK4)</TableHead>
+                    <TableHead className="text-white font-black uppercase text-[10px] tracking-wider text-right pr-6">Diferencia (Δ)</TableHead>
+                  </TableRow>
+                </TableHeader>
+                <TableBody className="font-mono text-xs">
                   
-                  {/* Tipado (value: number) añadido para resolver error ts(7006)[cite: 3, 4] */}
-                  <XAxis 
-                    dataKey="distance" 
-                    stroke="#ffffff20" 
-                    fontSize={10}
-                    tickFormatter={(value: number) => `${(value / 1000).toFixed(1)}k`}
-                    hide={false}
-                  />
+                  <TableRow className="border-b border-[#F39C63]/5 hover:bg-[#F39C63]/5 transition-colors">
+                    <TableCell className="font-sans font-bold text-white/70 py-4">DISTANCIA (m)</TableCell>
+                    <TableCell className="text-center text-[#F39C63] font-black text-sm">
+                      {data.hp71Solution?.distancia ? `${data.hp71Solution.distancia.toFixed(0)} m` : '---'}
+                    </TableCell>
+                    <TableCell className="text-center text-blue-400 font-black text-sm">
+                      {data.solution?.range ? `${data.solution.range.toFixed(0)} m` : '---'}
+                    </TableCell>
+                    <TableCell className={cn("text-right font-black text-sm pr-6", deltaDist.isCritical ? "text-red-500" : "text-green-400")}>
+                      {deltaDist.txt} {data.hp71Solution && 'm'}
+                    </TableCell>
+                  </TableRow>
 
-                  <YAxis 
-                    stroke="#ffffff20" 
-                    fontSize={10}
-                    domain={[0, (dataMax: number) => Math.ceil(dataMax * 1.1)]} 
-                    tickFormatter={(value: number) => `${Math.round(value)}m`}
-                  />
+                  <TableRow className="border-b border-[#F39C63]/5 hover:bg-[#F39C63]/5 transition-colors">
+                    <TableCell className="font-sans font-bold text-white/70 py-4">AZIMUT (Z) (₥)</TableCell>
+                    <TableCell className="text-center text-[#F39C63] font-black text-sm">
+                      {data.hp71Solution?.azimut ? `${Math.round(data.hp71Solution.azimut)} ₥` : '---'}
+                    </TableCell>
+                    <TableCell className="text-center text-blue-400 font-black text-sm">
+                      {data.solution?.azimuth ? `${Math.round(data.solution.azimuth)} ₥` : '---'}
+                    </TableCell>
+                    <TableCell className={cn("text-right font-black text-sm pr-6", deltaAzimut.isCritical ? "text-red-500" : "text-green-400")}>
+                      {deltaAzimut.txt} {data.hp71Solution && '₥'}
+                    </TableCell>
+                  </TableRow>
 
-                  <CartesianGrid strokeDasharray="3 3" stroke="#ffffff05" vertical={false} />
-                  <Area type="monotone" dataKey="altitude" stroke={SALMON_COLOR} strokeWidth={3} fillOpacity={1} fill="url(#colorAltReport)" isAnimationActive={true} animationDuration={1500} />
-                </AreaChart>
-              </ResponsiveContainer>
+                  <TableRow className="border-b border-[#F39C63]/5 hover:bg-[#F39C63]/5 transition-colors">
+                    <TableCell className="font-sans font-bold text-white/70 py-4">ELEVACIÓN (E) (₥)</TableCell>
+                    <TableCell className="text-center text-[#F39C63] font-black text-sm">
+                      {data.hp71Solution?.elevacion ? `${Math.round(data.hp71Solution.elevacion)} ₥` : '---'}
+                    </TableCell>
+                    <TableCell className="text-center text-blue-400 font-black text-sm">
+                      {data.solution?.elevMils ? `${Math.round(data.solution.elevMils)} ₥` : '---'}
+                    </TableCell>
+                    <TableCell className={cn("text-right font-black text-sm pr-6", deltaElev.isCritical ? "text-red-500" : "text-green-400")}>
+                      {deltaElev.txt} {data.hp71Solution && '₥'}
+                    </TableCell>
+                  </TableRow>
+
+                  <TableRow className="border-b border-[#F39C63]/5 hover:bg-[#F39C63]/5 transition-colors">
+                    <TableCell className="font-sans font-bold text-white/70 py-4">TIEMPO DE VUELO (T) (s)</TableCell>
+                    <TableCell className="text-center text-[#F39C63] font-black text-sm">
+                      {data.hp71Solution?.tiempoVuelo ? `${data.hp71Solution.tiempoVuelo.toFixed(1)} s` : '---'}
+                    </TableCell>
+                    <TableCell className="text-center text-blue-400 font-black text-sm">
+                      {data.solution?.timeOfFlight ? `${data.solution.timeOfFlight.toFixed(1)} s` : '---'}
+                    </TableCell>
+                    <TableCell className={cn("text-right font-black text-sm pr-6", deltaTiempo.isCritical ? "text-red-500" : "text-green-400")}>
+                      {deltaTiempo.txt} {data.hp71Solution && 's'}
+                    </TableCell>
+                  </TableRow>
+
+                  <TableRow className="hover:bg-[#F39C63]/5 transition-colors border-none">
+                    <TableCell className="font-sans font-bold text-white/70 py-4">CARGA / PIEZA DE ARTILLERÍA</TableCell>
+                    <TableCell className="text-center text-white/60 font-sans text-[11px]">
+                      {data.hp71Solution?.carga ? `CHG ${data.hp71Solution.carga} / Pza: ${data.hp71Solution.pieza}` : '---'}
+                    </TableCell>
+                    <TableCell className="text-center text-white/60 font-sans text-[11px]">
+                      {data.charge ? `CHG ${data.charge} / OBÚS` : '---'}
+                    </TableCell>
+                    <TableCell className="text-right text-white/40 font-sans text-[10px] pr-6">
+                      {data.hp71Solution?.carga === data.charge ? 'VERIFICADO' : 'DIFERENTE'}
+                    </TableCell>
+                  </TableRow>
+
+                </TableBody>
+              </Table>
             </div>
-            
-            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
-              <DataBox label="Alcance" value={`${report.range} m`} />
-              <DataBox label="Q.E. (Elev)" value={`${report.solution.elevMils} MIL`} color="text-[#F39C63]" />
-              <DataBox label="Max Ord" value={`${report.maxOrd} m`} color="text-amber-400" />
-              <DataBox label="Altura Obj" value={`${report.targetAlt} m`} color="text-sky-400" />
-              <DataBox label="Clasificación" value={report.classification} color="text-emerald-400" />
-            </div>
-          </TabsContent>
 
-          <TabsContent value="comparison" className="space-y-6 animate-in slide-in-from-right-4 duration-500 outline-none">
-            {manualResults.length === 0 ? (
-              <Card className="bg-black/40 border-[#F39C63]/20 overflow-hidden rounded-2xl backdrop-blur-md p-6">
-                <div className="text-center text-[#F39C63]/60">
-                  <p className="text-sm font-mono">Sin datos del emulador aún</p>
+            {hasCriticalDeviation ? (
+              <Card className="p-4 bg-red-950/30 border border-red-900/40 rounded-2xl flex items-start gap-3">
+                <ShieldAlert className="w-5 h-5 text-red-500 mt-0.5 flex-shrink-0 animate-pulse" />
+                <div>
+                  <h4 className="text-xs font-black uppercase tracking-wider text-red-400">Desviación Fuera de Tolerancia Militar</h4>
+                  <p className="text-[11px] text-red-200/60 leading-relaxed mt-1 font-sans">
+                    La variación entre el algoritmo de la HP-71B y la simulación por integración numérica RK4 supera los límites de seguridad de tiro artillero (±5 milésimas). Compruebe los coeficientes de arrastre atmosférico o el reglaje de las coordenadas UTM.
+                  </p>
                 </div>
               </Card>
-            ) : (
-              <Card className="bg-black/40 border-[#F39C63]/20 overflow-hidden rounded-2xl backdrop-blur-md">
-                <Table>
-                  <TableHeader className="bg-[#F39C63]/10">
-                    <TableRow className="hover:bg-transparent border-[#F39C63]/20">
-                      <TableHead className="text-[11px] font-black uppercase text-white/60 tracking-widest py-4">Parámetro</TableHead>
-                      <TableHead className="text-[11px] font-black uppercase text-white tracking-widest text-center">Simulador</TableHead>
-                      <TableHead className="text-[11px] font-black uppercase text-[#F39C63] tracking-widest text-center">Manual</TableHead>
-                      <TableHead className="text-[11px] font-black uppercase text-emerald-400 tracking-widest text-right">Delta</TableHead>
-                    </TableRow>
-                  </TableHeader>
-                  <TableBody>
-                    {manualResults.map((result, idx) => (
-                      <React.Fragment key={idx}>
-                        <TableRow className="border-[#F39C63]/10 hover:bg-[#F39C63]/5 transition-colors">
-                          <TableCell className="text-[11px] font-black uppercase text-white/50 py-5">ELEVACIÓN (Lectura {idx + 1})</TableCell>
-                          <TableCell className="text-sm font-mono text-white font-black text-center">{report.solution.elevMils} <span className="text-[10px] opacity-40">MIL</span></TableCell>
-                          <TableCell className="text-sm font-mono text-[#F39C63]/80 font-bold text-center">{result.elevacion.toFixed(2)} <span className="text-[10px] opacity-40">MIL</span></TableCell>
-                          <TableCell className="text-sm font-mono font-black text-emerald-400 text-right">+{Math.abs(parseFloat(report.solution.elevMils as string) - result.elevacion).toFixed(2)}</TableCell>
-                        </TableRow>
-                        <TableRow className="border-[#F39C63]/10 hover:bg-[#F39C63]/5 transition-colors">
-                          <TableCell className="text-[11px] font-black uppercase text-white/50 py-5">T. VUELO (Lectura {idx + 1})</TableCell>
-                          <TableCell className="text-sm font-mono text-white font-black text-center">{report.solution.timeOfFlight.toFixed(1)} <span className="text-[10px] opacity-40">s</span></TableCell>
-                          <TableCell className="text-sm font-mono text-[#F39C63]/80 font-bold text-center">{result.tof.toFixed(2)} <span className="text-[10px] opacity-40">s</span></TableCell>
-                          <TableCell className="text-sm font-mono font-black text-emerald-400 text-right">+{Math.abs(report.solution.timeOfFlight - result.tof).toFixed(2)}</TableCell>
-                        </TableRow>
-                        <TableRow className="border-[#F39C63]/10 hover:bg-[#F39C63]/5 transition-colors">
-                          <TableCell className="text-[11px] font-black uppercase text-white/50 py-5">ALCANCE (Lectura {idx + 1})</TableCell>
-                          <TableCell className="text-sm font-mono text-white font-black text-center">{report.range} <span className="text-[10px] opacity-40">m</span></TableCell>
-                          <TableCell className="text-sm font-mono text-[#F39C63]/80 font-bold text-center">{result.alcance.toFixed(0)} <span className="text-[10px] opacity-40">m</span></TableCell>
-                          <TableCell className="text-sm font-mono font-black text-emerald-400 text-right">+{Math.abs(parseFloat(report.range as string) - result.alcance).toFixed(0)}</TableCell>
-                        </TableRow>
-                      </React.Fragment>
-                    ))}
-                  </TableBody>
-                </Table>
-              </Card>
-            )}
+            ) : null}
           </TabsContent>
 
-          <TabsContent value="doctrinal" className="space-y-4 animate-in slide-in-from-right-4 duration-500 outline-none">
-            <div className="bg-black/30 border border-[#F39C63]/20 rounded-2xl overflow-hidden p-4 backdrop-blur-md">
-              <h3 className="text-xs font-black uppercase text-[#F39C63] mb-4 border-b border-[#F39C63]/20 pb-2 flex justify-between items-center">
-                <span>Registro de Misión Oficial (DA Form 4504)</span>
-              </h3>
-              <div className="grid grid-cols-2 sm:grid-cols-3 gap-3">
-                <DataBox label="Observador (CFF)" value={report.observerId || "N/A"} color="text-white" />
-                <DataBox label="Blanco Asignado" value={report.targetNumber || "N/A"} color="text-amber-400" />
-                <DataBox label="Tipo Misión" value={report.missionType || "N/A"} color="text-[#F39C63]" />
-                <DataBox label="Int. Vertical (VI)" value={`${report.verticalInterval || 0} m`} color={(report.verticalInterval || 0) >= 0 ? "text-emerald-400" : "text-rose-500"} />
-                <DataBox label="Lote Munición" value={report.ammoLot || "N/A"} color="text-white" />
-                <DataBox label="MET Temp/Viento" value={`${report.metTemp || 0}°C | ${report.metWindSpeed || 0}kt`} color="text-white" />
+          <TabsContent value="trajectory" className="mt-4 outline-none flex-1 min-h-0 overflow-hidden">
+            <Card className="h-full min-h-0 p-4 bg-[#05080c] border border-[#38BDF8]/20 backdrop-blur-sm rounded-2xl">
+              <div className="grid h-full min-h-0 grid-cols-1 lg:grid-cols-[1.6fr_0.9fr] gap-4">
+                <div className="h-full min-h-0 flex flex-col border border-[#38BDF8]/15 bg-[#061426]/70 rounded-xl p-4">
+                  <div className="flex-none text-center text-[#93C5FD] font-black uppercase tracking-[0.22em] text-xs mb-3">
+                    Trayectoria Táctica
+                  </div>
+                  <div className="flex-1 min-h-0 w-full font-mono text-[10px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={trajectory} margin={{ top: 10, right: 18, left: 0, bottom: 12 }}>
+                        <defs>
+                          <linearGradient id="blueTrajectoryAlt" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor={BLUE_COLOR} stopOpacity={0.35}/>
+                            <stop offset="95%" stopColor={BLUE_COLOR} stopOpacity={0.04}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#1E3A5F" />
+                        <XAxis
+                          dataKey="distance"
+                          stroke="#93A4B8"
+                          tickFormatter={(v) => `${Number(v).toFixed(0)}`}
+                          label={{ value: 'ALCANCE (M)', position: 'insideBottom', offset: -8, fill: '#E5E7EB' }}
+                        />
+                        <YAxis
+                          stroke="#93A4B8"
+                          label={{ value: 'ALTITUD (M)', angle: -90, position: 'insideLeft', fill: '#E5E7EB' }}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="altitude"
+                          stroke={BLUE_COLOR}
+                          strokeWidth={3}
+                          fillOpacity={1}
+                          fill="url(#blueTrajectoryAlt)"
+                          dot={false}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                <div className="h-full min-h-0 flex flex-col gap-4">
+                  <div className="flex-none border border-[#38BDF8]/15 rounded-xl p-4 bg-black/50">
+                    <div className="text-[#F39C63] font-black uppercase tracking-[0.2em] text-xs mb-4">
+                      Sistema de Datos Tácticos
+                    </div>
+                    <div className="space-y-2 font-mono">
+                      <TrajectoryMetric label="ALCANCE" value={`${data.solution.range.toFixed(2)} M`} />
+                      <TrajectoryMetric label="TIEMPO VUELO" value={`${data.solution.timeOfFlight.toFixed(2)} S`} />
+                      <TrajectoryMetric label="ALTITUD MÁX" value={`${Math.max(maxAltitude, data.solution.maxOrdinate).toFixed(2)} M`} />
+                      <TrajectoryMetric label="VELOCIDAD FINAL" value={`${finalVelocity.toFixed(2)} M/S`} />
+                      <TrajectoryMetric label="MACH FINAL" value={machFinal.toFixed(3)} />
+                    </div>
+                  </div>
+
+                  <div className="flex-1 min-h-0 border border-[#38BDF8]/15 rounded-xl p-4 bg-black/50">
+                    <div className="text-[10px] text-white/60 uppercase mb-3">Explicación</div>
+                    <p className="text-xs text-white/80 font-mono leading-relaxed">
+                      El proyectil {data.weapon} con carga {data.charge} alcanzó {data.solution.range.toFixed(0)} metros
+                      en {data.solution.timeOfFlight.toFixed(1)} segundos, con una altura máxima aproximada de {data.solution.maxOrdinate.toFixed(0)} metros.
+                    </p>
+                    <p className="text-xs text-white/70 font-mono leading-relaxed mt-3">
+                      La curva azul representa la trayectoria calculada por el motor balístico RK4 para el reporte de fuego.
+                    </p>
+                  </div>
+                </div>
               </div>
-            </div>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="telemetry" className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 outline-none flex-1 min-h-0 overflow-hidden content-start">
+            <DataBox label="Sistema de Armas" value={data.weapon} />
+            <DataBox label="Carga de Proyección" value={`CHG ${data.charge}`} />
+            <DataBox label="Altitud de Impacto" value={`${data.targetAlt} M`} />
+            <DataBox label="Coordenadas UTM" value={data.targetUTM} />
+            <DataBox label="Georreferencia MGRS" value={data.targetMGRS} color="text-blue-400" />
+            <DataBox label="Daño Estimado" value={`${data.impactDamage}%`} color="text-red-500" />
           </TabsContent>
         </Tabs>
 
-        <DialogFooter className="flex flex-row gap-4 mt-8">
-          <Button variant="outline" className="flex-1 uppercase font-black text-xs tracking-[0.25em] h-14 rounded-2xl border-2 border-[#7c4a3a] bg-black/20 text-gray-300" onClick={onClose}>
-            CERRAR
-          </Button>
-          <Button className="flex-1 bg-[#F39C63] hover:bg-[#ffad75] text-black uppercase font-black text-xs tracking-widest h-14 rounded-2xl shadow-[0_10px_20px_rgba(243,156,99,0.3)]">
-            IMPRIMIR INFORME
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
@@ -234,17 +319,11 @@ function DataBox({ label, value, color = "text-[#F39C63]" }: { label: string, va
   );
 }
 
-function ComparisonRow({ label, sim, man, unit }: { label: string, sim: any, man: any, unit: string }) {
-  const sVal = parseFloat(sim);
-  const mVal = parseFloat(man);
-  const diff = Math.abs(sVal - mVal).toFixed(1);
-  
+function TrajectoryMetric({ label, value }: { label: string; value: string }) {
   return (
-    <TableRow className="border-[#F39C63]/10 hover:bg-[#F39C63]/5 transition-colors">
-      <TableCell className="text-[11px] font-black uppercase text-white/50 py-5">{label}</TableCell>
-      <TableCell className="text-sm font-mono text-white font-black text-center">{sim} <span className="text-[10px] opacity-40">{unit}</span></TableCell>
-      <TableCell className="text-sm font-mono text-[#F39C63]/80 font-bold text-center">{man} <span className="text-[10px] opacity-40">{unit}</span></TableCell>
-      <TableCell className="text-sm font-mono font-black text-emerald-400 text-right">+{diff}</TableCell>
-    </TableRow>
+    <div className="bg-[#07110d]/80 border border-white/5 px-3 py-3">
+      <span className="text-[#F39C63] text-xs font-black tracking-wider">{label}: </span>
+      <span className="text-[#F39C63] text-xs font-black tracking-wider">{value}</span>
+    </div>
   );
 }
