@@ -15,6 +15,29 @@ function isAskingForBasePiece(text: string): boolean {
 // ---------- Tipado de teclas ----------
 type KeyColor = "black" | "white" | "orange" | "blue";
 
+const COLOR_PALETTE: Record<KeyColor, { top: string; front: string; text: string }> = {
+  black: {
+    top: "bg-gradient-to-b from-[#383838] via-[#242424] to-[#1e1e1e]",
+    front: "bg-[#121212]",
+    text: "text-gray-100",
+  },
+  white: {
+    top: "bg-gradient-to-b from-[#f2ece0] via-[#dfd8ca] to-[#cbc3b3]",
+    front: "bg-[#a39a87]",
+    text: "text-[#1a1a1a]",
+  },
+  orange: {
+    top: "bg-gradient-to-b from-[#eab308] via-[#ca8a04] to-[#a16207]",
+    front: "bg-[#713f12]",
+    text: "text-black",
+  },
+  blue: {
+    top: "bg-gradient-to-b from-[#0284c7] via-[#0369a1] to-[#075985]",
+    front: "bg-[#0c4a6e]",
+    text: "text-white",
+  },
+};
+
 interface KeyProps {
   label: string;
   data: string;
@@ -36,30 +59,37 @@ const CalcKey: React.FC<KeyProps> = ({
   className = "",
   onClick,
 }) => {
-  const styles = {
-    black: { top: "bg-gradient-to-b from-[#3a3a3a] via-[#222] to-[#1c1c1c]", front: "bg-[#0f0f0f]", text: "text-gray-100" },
-    white: { top: "bg-gradient-to-b from-[#e3ddd1] via-[#c4bdab] to-[#cfc8b6]", front: "bg-[#8e8674]", text: "text-black" },
-    orange: { top: "bg-gradient-to-b from-[#fbcf33] via-[#f59e0b] to-[#fbbf24]", front: "bg-[#b45309]", text: "text-black" },
-    blue: { top: "bg-gradient-to-b from-[#7dd3fc] via-[#0ea5e9] to-[#38bdf8]", front: "bg-[#0369a1]", text: "text-white" },
-  }[color] || { top: "bg-[#2a2a2a]", front: "bg-[#141414]", text: "text-gray-200" };
+  const styles = COLOR_PALETTE[color] || COLOR_PALETTE.black;
 
   return (
-    <div className={`flex flex-col items-center group select-none relative z-10 mx-0.5 ${className}`}>
-      <div className="h-4 mb-1 flex flex-col items-center justify-end">
-        {topLabel && <span className="text-[7px] text-[#C2A766] font-black uppercase">{topLabel}</span>}
+    <div className={`flex flex-col items-center select-none relative z-10 mx-[1px] sm:mx-[1.5px] ${className}`}>
+      <div className="h-4 mb-[2px] flex flex-col items-center justify-end">
+        {topLabel && (
+          <span className="text-[7.5px] sm:text-[8.5px] text-[#C5A059] font-black uppercase tracking-tight">
+            {topLabel}
+          </span>
+        )}
       </div>
 
-      <button onClick={() => onClick(data)} className="relative active:translate-y-[2px] transition-all duration-75">
-        <div className={`relative z-10 w-12 h-8 ${styles.top} rounded-t-md border-t border-x border-white/10 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]`}>
-          <span className={`text-sm font-black ${styles.text}`}>{label}</span>
+      <button onClick={() => onClick(data)} className="relative active:translate-y-[1.5px] transition-all duration-75 group outline-none">
+        <div className={`relative z-10 w-9 h-[22px] sm:w-[46px] sm:h-[26px] ${styles.top} rounded-t-[3px] border-t border-x border-white/5 flex items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.15)] group-hover:brightness-105 transition-all`}>
+          <span className={`text-[10px] sm:text-[11px] font-black tracking-wide ${styles.text}`}>{label}</span>
         </div>
-        <div className={`relative z-10 w-12 h-3 ${styles.front} rounded-b-md border-b-[3px] border-black/90 flex items-center justify-center`}>
-          {subLabel && <span className="text-[8px] text-[#00e5ff] font-bold">{subLabel}</span>}
+        <div className={`relative z-10 w-9 h-2.5 sm:w-[46px] sm:h-3.5 ${styles.front} rounded-b-[3px] border-b-[2.5px] border-black/85 flex items-center justify-center`}>
+          {subLabel && (
+            <span className="text-[7px] sm:text-[8.5px] text-[#29f3ff] font-extrabold tracking-tight scale-[0.85] sm:scale-100">
+              {subLabel}
+            </span>
+          )}
         </div>
       </button>
 
-      <div className="h-4 mt-1">
-        {bottomLabel && <span className="text-[7px] font-bold text-gray-400 uppercase">{bottomLabel}</span>}
+      <div className="h-4 mt-[2px] flex items-start justify-center">
+        {bottomLabel && (
+          <span className="text-[7px] sm:text-[8px] text-[#29f3ff] font-extrabold uppercase tracking-tighter">
+            {bottomLabel}
+          </span>
+        )}
       </div>
     </div>
   );
@@ -101,6 +131,20 @@ function parsePieces(text: string): PieceResult[] {
   }
 
   return result;
+}
+
+function getVisibleLcdLines(text: string, preferStart: boolean): [string, string] {
+  const lines = text.split(/\r?\n/);
+  const relevantLines = preferStart ? lines : lines.filter((line) => line.trim() !== "");
+
+  if (preferStart) {
+    return [relevantLines[0] ?? "", relevantLines[1] ?? ""];
+  }
+
+  return [
+    relevantLines[Math.max(0, relevantLines.length - 2)] ?? "",
+    relevantLines[Math.max(0, relevantLines.length - 1)] ?? "",
+  ];
 }
 
 // ---------- Componente principal ----------
@@ -204,7 +248,7 @@ export default function HP71Emulator() {
   }, [basePieceNumber, loading]);
 
   // ---------- Manejo unificado de teclas ----------
-    const handleKeyPress = useCallback(
+  const handleKeyPress = useCallback(
     (key: string) => {
       console.log("Tecla presionada:", key);
 
@@ -282,7 +326,7 @@ export default function HP71Emulator() {
       }
       setBuffer((prev) => prev + key.toUpperCase());
     },
-    [buffer, sendCommand, pieces.length, logEvent, waitingBasePiece, basePieceNumber]
+    [buffer, sendCommand, pieces.length, pieces, logEvent, waitingBasePiece, basePieceNumber]
   );
 
   // ---------- Teclado físico ----------
@@ -313,49 +357,88 @@ export default function HP71Emulator() {
     ? screenText + buffer
     : screenText;
 
-  return (
-    <div className="flex flex-col items-center justify-center min-h-screen bg-[#121212] p-8">
-      <div className="relative bg-gradient-to-b from-[#4a4a4a] to-[#2a2a2a] p-10 rounded-[40px] shadow-[0_25px_50px_-12px_rgba(0,0,0,0.8)] border-x-4 border-b-[12px] border-[#1a1a1a] w-max">
-        <div className="absolute inset-0 bg-[radial-gradient(circle_at_top,_rgba(255,255,255,0.06),_transparent_40%)] pointer-events-none rounded-[40px]" />
+  const visibleLcdLines = getVisibleLcdLines(lcdContent, pieceMode);
 
-        <div className="flex justify-end mb-4">
-          <a href="/hp71_log.txt" target="_blank" className="text-[#baff7c] text-sm underline hover:text-white z-10">
-            📄 LOG
+  return (
+    <div className="min-h-screen bg-[#0d0d0f] text-gray-100 flex items-center justify-center p-4 sm:p-6 overflow-x-auto">
+      <style dangerouslySetInnerHTML={{__html: `
+        @import url('https://fonts.googleapis.com/css2?family=WDXL+Lubrifont+JP+N:wght@400;700;900&display=swap');
+
+        .retro-lcd-font {
+          font-family: "WDXL Lubrifont JP N", monospace;
+          font-weight: 900;
+        }
+
+        .lcd-grid-overlay {
+          background-image:
+            linear-gradient(rgba(0, 0, 0, 0.08) 50%, transparent 50%),
+            linear-gradient(90deg, rgba(0, 0, 0, 0.08) 50%, transparent 50%);
+          background-size: 2px 2px;
+        }
+      `}} />
+
+      <div className="relative bg-[#1a1a1a] p-[10px] sm:p-[14px] rounded-[20px] shadow-[0_35px_80px_-15px_rgba(0,0,0,0.95)] border-[4px] border-[#101011] border-b-[12px] max-w-full w-[940px]">
+        <div className="absolute right-4 top-4 z-30">
+          <a href="/hp71_log.txt" target="_blank" className="text-[#29f3ff] text-xs underline hover:text-white">
+            LOG
           </a>
         </div>
 
-        {/* --- PANTALLA LCD --- */}
-        <div className="mb-12 flex justify-center z-10">
-          <div className="bg-gradient-to-r from-[#d9c7a0] via-[#ae986d] to-[#d9c7a0] px-[32px] py-[4px] rounded shadow-[inset_1px_1px_3px_rgba(0,0,0,0.4)] border border-[#c4a96c]">
-            <div className="relative bg-[#8b967d] w-[540px] h-24 p-4 shadow-[inset_4px_4px_12px_rgba(0,0,0,0.6)] border-2 border-[#7a856c] flex items-center overflow-hidden">
-              <div className="absolute inset-0 bg-gradient-to-t from-black/20 via-transparent to-white/10 pointer-events-none" />
-              <div className="relative z-10 font-mono text-[#1a1a1a] text-xl font-bold w-full h-full overflow-auto whitespace-pre-wrap leading-tight scrollbar-hide">
-                {lcdContent}
-                <span className={`inline-block w-3 h-6 bg-[#1a1a1a]/80 ml-1 align-middle ${loading ? "animate-pulse" : ""}`} />
+        <div className="relative h-[175px] w-full select-none overflow-hidden">
+          <div
+            className="absolute inset-0 bg-[#121212] rounded-t-[8px]"
+            style={{ clipPath: "polygon(0 0, 100% 0, 100% 169px, 64% 169px, 64% 137px, 0 137px)" }}
+          />
+
+          <div
+            className="absolute inset-0 bg-gradient-to-b from-[#e8e8e8] via-[#cfcfcf] to-[#adadad] rounded-t-[8px] shadow-[inset_1px_1px_1px_rgba(255,255,255,0.4)]"
+            style={{ clipPath: "polygon(0 0, 100% 0, 100% 157px, 64% 157px, 64% 135px, 0 135px)" }}
+          />
+
+          <div className="absolute inset-0 flex z-20">
+            <div className="w-[64%] h-[135px] flex items-center px-4 pr-6">
+              <div className="relative bg-[#7d8671] p-[4px] rounded border-2 border-[#52594a] shadow-[inset_2px_2px_6px_rgba(0,0,0,0.65)] w-full h-[106px] flex items-center overflow-hidden">
+                <div className="absolute inset-0 lcd-grid-overlay pointer-events-none" />
+                <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-transparent to-black/5 pointer-events-none" />
+
+                <div className="relative w-full h-full px-4 py-2 flex flex-col justify-around overflow-hidden z-10">
+                  <div className="retro-lcd-font text-[#181d15] text-[20px] sm:text-[25px] flex flex-col w-full h-full justify-around tracking-[0.08em] uppercase select-none leading-none">
+                    <div className="opacity-85 overflow-hidden whitespace-nowrap">
+                      {visibleLcdLines[0]}
+                    </div>
+                    <div className="flex items-center overflow-hidden whitespace-nowrap">
+                      <span>{visibleLcdLines[1]}</span>
+                      <span className={`inline-block w-[10px] h-[18px] bg-[#1a1a1a]/85 ml-[2px] ${loading ? "animate-pulse" : ""}`} />
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <div className="w-[36%] h-[157px] flex flex-col justify-between py-3.5 px-4">
+              <div className="bg-[#121212] p-1.5 rounded border border-[#444] shadow-[inset_0_1px_2px_rgba(0,0,0,0.7)] flex items-center gap-2 w-full h-11 self-start">
+                <div className="bg-[#dfdfdf] rounded-sm p-[1px] w-6 h-6 flex items-center justify-center border border-black shadow-sm">
+                  <span className="text-black font-serif font-black italic text-[11px] leading-none tracking-tighter">hp</span>
+                </div>
+                <div className="flex flex-col text-left">
+                  <span className="text-[#dfdfdf] font-sans font-black tracking-[0.08em] text-[7px] leading-tight">HEWLETT</span>
+                  <span className="text-[#dfdfdf] font-sans font-black tracking-[0.08em] text-[7px] leading-none">PACKARD</span>
+                </div>
+                <div className="ml-auto flex items-end h-full pb-[1px]">
+                  <span className="text-[#c5a059] font-sans font-black tracking-wide text-[14px] leading-none shadow-sm">71B</span>
+                </div>
+              </div>
+
+              <div className="w-full h-[72px] bg-gradient-to-b from-[#dfdfdf] to-[#bcbcbc] rounded-[3px] border border-[#bcbcbc]/40 shadow-[inset_1px_1px_2px_rgba(0,0,0,0.35),_0_1.5px_2px_rgba(0,0,0,0.5)] flex items-center justify-center relative">
+                <div className="absolute inset-x-0 bottom-2 h-[1px] bg-black/10" />
               </div>
             </div>
           </div>
         </div>
 
-        {/* --- BRANDING --- */}
-        <div className="flex justify-between items-start mb-8 px-2 z-10">
-          <div className="flex items-center gap-3 bg-gradient-to-r from-[#222] to-[#333] p-3 rounded border border-white/5 shadow-inner">
-            <div className="bg-white p-1 rounded-sm flex items-center justify-center w-12 h-10">
-              <span className="text-black font-bold tracking-widest text-[10px] leading-tight">V-IMM</span>
-            </div>
-            <div className="flex flex-col">
-              <span className="text-white font-bold tracking-widest text-[10px] leading-tight">COMPUTADORA</span>
-              <span className="text-white font-bold tracking-widest text-[10px] leading-tight">BALÍSTICA</span>
-            </div>
-            <div className="h-10 w-[1px] bg-white/10 mx-2" />
-            <span className="text-white font-black text-3xl tracking-tighter">C . O . R . Z</span>
-          </div>
-        </div>
-
-        {/* --- TECLADO COMPLETO ORIGINAL --- */}
-        <div className="flex px-6 py-8 bg-[#222]/50 rounded-3xl border border-black/40 z-10">
-          <div className="relative z-10 flex gap-4 items-start">
-            <div className="grid grid-cols-10 gap-x-1.5 gap-y-5">
+        <div className="px-2 py-4 sm:px-4 sm:py-5 bg-[#181818] rounded-b-lg shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+          <div className="flex flex-col md:flex-row gap-2 items-start overflow-x-auto">
+            <div className="grid grid-cols-10 gap-x-[1px] sm:gap-x-[2px] gap-y-1.5 flex-1">
               {[{k:"Q", t:"IF"}, {k:"W", t:"THEN"}, {k:"E", t:"ELSE"}, {k:"R", t:"FOR"}, {k:"T", t:"TO"}, {k:"Y", t:"NEXT"}, {k:"U", t:"DEF"}, {k:"I", t:"KEY"}, {k:"O", t:"ADD"}, {k:"P", t:"LR"}].map(x => <CalcKey key={x.k} label={x.k} topLabel={x.t} onClick={handleKeyPress} data={x.k} />)}
               {[{k:"A", t:"CALL"}, {k:"S", t:"GOSUB"}, {k:"D", t:"RETURN"}, {k:"F", t:"GOTO"}, {k:"G", t:"INPUT"}, {k:"H", t:"PRINT"}, {k:"J", t:"DISP"}, {k:"K", t:"DIM"}, {k:"L", t:"BEEP"}, {k:"=", t:"FACT", s:";"}].map(x => <CalcKey key={x.k} label={x.k} topLabel={x.t} subLabel={x.s} onClick={handleKeyPress} data={x.k} />)}
               {[{k:"Z", t:"EDIT"}, {k:"X", t:"CAT"}, {k:"C", t:"NAME"}, {k:"V", t:"PURGE"}, {k:"B", t:"FETCH"}, {k:"N", t:"LIST"}, {k:"M", t:"DELETE"}, {k:"(", t:"AUTO", s:"["}, {k:")", t:"COPY", s:"]"}].map(x => <CalcKey key={x.k} label={x.k} topLabel={x.t} subLabel={x.s} onClick={handleKeyPress} data={x.k} />)}
@@ -364,29 +447,29 @@ export default function HP71Emulator() {
               <CalcKey label="f" color="orange" onClick={handleKeyPress} data="F" />
               <CalcKey label="g" color="blue" onClick={handleKeyPress} data="G" />
 
-              {[{k:"RUN", t:"SST", s:"CNTL"}, {k:"<", t:"BACK", s:"|<"}, {k:">", t:"CHAR", s:">|"}, {k:"SPC", t:"I/R", s:"ERRM"}, {k:"^", t:"LC", s:"A"}, {k:"v", t:"LINE", s:"V"}].map(x => <CalcKey key={x.k} label={x.k} topLabel={x.t} subLabel={x.s} onClick={handleKeyPress} data={x.k} />)}
+              {[{k:"RUN", t:"SST", s:"CNTL"}, {k:"<", t:"BACK", s:"|<"}, {k:">", t:"-CHAR", s:">|"}, {k:"SPC", t:"I/R", s:"ERRM"}, {k:"^", t:"LC", s:"A"}, {k:"v", t:"-LINE", s:"V"}].map(x => <CalcKey key={x.k} label={x.k} topLabel={x.t} subLabel={x.s} onClick={handleKeyPress} data={x.k} />)}
             </div>
 
-            <div className="flex flex-col items-center pt-[45px]">
-              <span className="text-[7px] text-[#C2A766] font-black mb-2 uppercase">RES</span>
-              <div className="relative w-12 h-[105px]">
-                <div className="absolute inset-0 bg-[#0a0a0a] rounded-md shadow-inner translate-y-[1px]" />
-                <button onClick={() => handleKeyPress("ENTER")} className="relative w-full h-full group active:translate-y-[4px] transition-all">
-                  <div className="relative z-20 w-full h-[85px] bg-gradient-to-b from-[#3a3a3a] via-[#222] to-[#1a1a1a] border-t border-white/10 border-x border-white/5 rounded-t-md flex flex-col items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.2)]">
-                    <div className="flex flex-col text-[10px] font-bold text-gray-100 items-center">
+            <div className="flex flex-col items-center pt-[20px] w-full md:w-auto self-stretch justify-center md:justify-start">
+              <span className="text-[7.5px] sm:text-[8.5px] text-[#C5A059] font-black mb-[3px] uppercase tracking-wider hidden md:inline">RES</span>
+              <div className="relative w-full md:w-[46px] h-14 md:h-[88px]">
+                <div className="absolute inset-0 bg-[#09090a] rounded-[3px] shadow-inner translate-y-[1px]" />
+                <button onClick={() => handleKeyPress("ENTER")} className="relative w-full h-full group active:translate-y-[2px] transition-all outline-none">
+                  <div className="relative z-20 w-full h-[72%] bg-gradient-to-b from-[#3a3a3a] via-[#242424] to-[#1e1e1e] border-t border-white/5 border-x border-white/5 rounded-t-[3px] flex flex-col items-center justify-center shadow-[inset_0_1px_0_rgba(255,255,255,0.15)] group-hover:brightness-105">
+                    <div className="flex flex-row md:flex-col text-[8.5px] sm:text-[9.5px] font-extrabold text-gray-100 items-center leading-tight">
                       <span>END</span>
-                      <div className="w-6 h-[0.5px] bg-white/20 my-1" />
+                      <span className="hidden md:inline w-5 h-[0.5px] bg-white/20 my-1" />
                       <span>LINE</span>
                     </div>
                   </div>
-                  <div className="relative z-10 w-full h-5 bg-[#0f0f0f] rounded-b-md border-b-[3px] border-black/90 flex items-center justify-center">
-                    <span className="text-[8px] text-[#00e5ff] font-bold tracking-widest uppercase">CMDS</span>
+                  <div className="relative z-10 w-full h-[28%] bg-[#121212] rounded-b-[3px] border-b-[2.5px] border-black/80 flex items-center justify-center">
+                    <span className="text-[7.5px] text-[#29f3ff] font-extrabold tracking-wider uppercase">CMDS</span>
                   </div>
                 </button>
               </div>
             </div>
 
-            <div className="grid grid-cols-4 gap-x-1.5 gap-y-5 border-l border-black/20 pl-4 relative z-10">
+            <div className="grid grid-cols-4 gap-x-[1.5px] sm:gap-x-[2.5px] gap-y-1.5 border-t md:border-t-0 md:border-l border-black/50 pt-4 md:pt-0 md:pl-3.5 self-stretch md:self-auto">
               {[
                 {k: "7", t: "PREDV", s: "|"}, {k: "8", t: "MEAN", s: "("}, {k: "9", t: "SDEV", s: ")"}, {k: "/", t: "SQR", s: "^"},
                 {k: "4", t: "SIN", s: "$"}, {k: "5", t: "COS", s: "%"}, {k: "6", t: "TAN", s: "&"}, {k: "*", t: "EXP", s: ":"},

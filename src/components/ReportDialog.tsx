@@ -12,7 +12,7 @@ import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FileText, ArrowRightLeft, ClipboardList, ShieldAlert, CheckCircle2 } from 'lucide-react';
+import { FileText, ArrowRightLeft, ClipboardList, ShieldAlert } from 'lucide-react';
 import { type TrajectoryPoint, type FiringSolution } from '@/lib/ballistics';
 import { 
   AreaChart, 
@@ -24,7 +24,7 @@ import {
 } from 'recharts';
 import { cn } from '@/lib/utils';
 
-const SALMON_COLOR = "#F39C63";
+const BLUE_COLOR = "#38BDF8";
 
 export interface MilitaryBallisticData {
   pieza: number | string;
@@ -82,10 +82,15 @@ export function ReportDialog({ isOpen, onClose, data }: ReportDialogProps) {
   const deltaTiempo = getDelta(data.solution.timeOfFlight, data.hp71Solution?.tiempoVuelo, false);
 
   const hasCriticalDeviation = deltaElev.isCritical || deltaAzimut.isCritical;
+  const trajectory = data.trajectory || [];
+  const impactPoint = trajectory[trajectory.length - 1];
+  const maxAltitude = trajectory.reduce((max, point) => Math.max(max, point.altitude), 0);
+  const finalVelocity = impactPoint?.velocity ?? data.solution.impactVelocity ?? 0;
+  const machFinal = finalVelocity / 343;
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-4xl bg-black/95 text-white border border-[#F39C63]/20 backdrop-blur-2xl rounded-3xl shadow-[0_0_50px_rgba(243,156,99,0.15)] overflow-hidden p-6">
+      <DialogContent className="max-w-6xl h-[85vh] flex flex-col bg-black/95 text-white border border-[#38BDF8]/20 backdrop-blur-2xl rounded-3xl shadow-[0_0_50px_rgba(56,189,248,0.12)] overflow-hidden p-6">
         
         <DialogHeader className="relative z-10">
           <div className="flex items-center gap-3">
@@ -106,7 +111,7 @@ export function ReportDialog({ isOpen, onClose, data }: ReportDialogProps) {
           </div>
         </DialogHeader>
 
-        <Tabs defaultValue="comparison" className="w-full mt-4 relative z-10">
+        <Tabs defaultValue="comparison" className="w-full mt-4 relative z-10 flex-1 min-h-0 flex flex-col">
           <TabsList className="bg-black/60 border border-[#F39C63]/10 p-1 rounded-xl w-full grid grid-cols-3">
             <TabsTrigger value="comparison" className="data-[state=active]:bg-[#F39C63] data-[state=active]:text-black text-xs font-black uppercase tracking-wider rounded-lg transition-all">
               <ArrowRightLeft className="w-3.5 h-3.5 mr-1.5" /> Mapeo y Comparación HP-71B
@@ -119,7 +124,7 @@ export function ReportDialog({ isOpen, onClose, data }: ReportDialogProps) {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="comparison" className="mt-4 space-y-4 outline-none">
+          <TabsContent value="comparison" className="mt-4 space-y-4 outline-none flex-1 min-h-0 overflow-y-auto pr-1">
             <div className="border border-[#F39C63]/10 rounded-2xl overflow-hidden bg-black/40 backdrop-blur-sm">
               <Table>
                 <TableHeader className="bg-[#F39C63]/5">
@@ -211,41 +216,80 @@ export function ReportDialog({ isOpen, onClose, data }: ReportDialogProps) {
                   </p>
                 </div>
               </Card>
-            ) : (
-              <Card className="p-4 bg-green-950/30 border border-green-900/40 rounded-2xl flex items-start gap-3">
-                <CheckCircle2 className="w-5 h-5 text-green-500 mt-0.5 flex-shrink-0" />
-                <div>
-                  <h4 className="text-xs font-black uppercase tracking-wider text-green-400">Solución Homologada con Éxito</h4>
-                  <p className="text-[11px] text-green-200/60 leading-relaxed mt-1 font-sans">
-                    Los datos de la calculadora de hardware militar coinciden perfectamente con el motor simulador balístico dentro de las tolerancias operacionales de las Fuerzas Armadas de Honduras.
-                  </p>
-                </div>
-              </Card>
-            )}
+            ) : null}
           </TabsContent>
 
-          <TabsContent value="trajectory" className="mt-4 outline-none">
-            <Card className="p-4 bg-black/40 border border-[#F39C63]/10 backdrop-blur-sm rounded-2xl">
-              <div className="h-[240px] w-full font-mono text-[10px]">
-                <ResponsiveContainer width="100%" height="100%">
-                  <AreaChart data={data.trajectory || []} margin={{ top: 10, right: 10, left: -20, bottom: 0 }}>
-                    <defs>
-                      <linearGradient id="colorAlt" x1="0" y1="0" x2="0" y2="1">
-                        <stop offset="5%" stopColor={SALMON_COLOR} stopOpacity={0.2}/>
-                        <stop offset="95%" stopColor={SALMON_COLOR} stopOpacity={0}/>
-                      </linearGradient>
-                    </defs>
-                    <CartesianGrid strokeDasharray="3 3" stroke="#222" />
-                    <XAxis dataKey="distance" stroke="#666" tickFormatter={(v) => `${(v/1000).toFixed(1)}k`} label={{ value: 'Distancia (m)', position: 'insideBottomRight', offset: -5, fill: '#666' }} />
-                    <YAxis stroke="#666" label={{ value: 'Altitud (m)', angle: -90, position: 'insideLeft', offset: 10, fill: '#666' }} />
-                    <Area type="monotone" dataKey="altitude" stroke={SALMON_COLOR} strokeWidth={2} fillOpacity={1} fill="url(#colorAlt)" />
-                  </AreaChart>
-                </ResponsiveContainer>
+          <TabsContent value="trajectory" className="mt-4 outline-none flex-1 min-h-0 overflow-y-auto pr-1">
+            <Card className="p-4 bg-[#05080c] border border-[#38BDF8]/20 backdrop-blur-sm rounded-2xl">
+              <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_0.9fr] gap-4">
+                <div className="border border-[#38BDF8]/15 bg-[#061426]/70 rounded-xl p-4">
+                  <div className="text-center text-[#93C5FD] font-black uppercase tracking-[0.22em] text-xs mb-3">
+                    Trayectoria Táctica
+                  </div>
+                  <div className="h-[360px] w-full font-mono text-[10px]">
+                    <ResponsiveContainer width="100%" height="100%">
+                      <AreaChart data={trajectory} margin={{ top: 10, right: 18, left: 0, bottom: 12 }}>
+                        <defs>
+                          <linearGradient id="blueTrajectoryAlt" x1="0" y1="0" x2="0" y2="1">
+                            <stop offset="5%" stopColor={BLUE_COLOR} stopOpacity={0.35}/>
+                            <stop offset="95%" stopColor={BLUE_COLOR} stopOpacity={0.04}/>
+                          </linearGradient>
+                        </defs>
+                        <CartesianGrid strokeDasharray="3 3" stroke="#1E3A5F" />
+                        <XAxis
+                          dataKey="distance"
+                          stroke="#93A4B8"
+                          tickFormatter={(v) => `${Number(v).toFixed(0)}`}
+                          label={{ value: 'ALCANCE (M)', position: 'insideBottom', offset: -8, fill: '#E5E7EB' }}
+                        />
+                        <YAxis
+                          stroke="#93A4B8"
+                          label={{ value: 'ALTITUD (M)', angle: -90, position: 'insideLeft', fill: '#E5E7EB' }}
+                        />
+                        <Area
+                          type="monotone"
+                          dataKey="altitude"
+                          stroke={BLUE_COLOR}
+                          strokeWidth={3}
+                          fillOpacity={1}
+                          fill="url(#blueTrajectoryAlt)"
+                          dot={false}
+                        />
+                      </AreaChart>
+                    </ResponsiveContainer>
+                  </div>
+                </div>
+
+                <div className="space-y-4">
+                  <div className="border border-[#38BDF8]/15 rounded-xl p-4 bg-black/50">
+                    <div className="text-[#F39C63] font-black uppercase tracking-[0.2em] text-xs mb-4">
+                      Sistema de Datos Tácticos
+                    </div>
+                    <div className="space-y-2 font-mono">
+                      <TrajectoryMetric label="ALCANCE" value={`${data.solution.range.toFixed(2)} M`} />
+                      <TrajectoryMetric label="TIEMPO VUELO" value={`${data.solution.timeOfFlight.toFixed(2)} S`} />
+                      <TrajectoryMetric label="ALTITUD MÁX" value={`${Math.max(maxAltitude, data.solution.maxOrdinate).toFixed(2)} M`} />
+                      <TrajectoryMetric label="VELOCIDAD FINAL" value={`${finalVelocity.toFixed(2)} M/S`} />
+                      <TrajectoryMetric label="MACH FINAL" value={machFinal.toFixed(3)} />
+                    </div>
+                  </div>
+
+                  <div className="border border-[#38BDF8]/15 rounded-xl p-4 bg-black/50 min-h-[160px]">
+                    <div className="text-[10px] text-white/60 uppercase mb-3">Explicación</div>
+                    <p className="text-xs text-white/80 font-mono leading-relaxed">
+                      El proyectil {data.weapon} con carga {data.charge} alcanzó {data.solution.range.toFixed(0)} metros
+                      en {data.solution.timeOfFlight.toFixed(1)} segundos, con una altura máxima aproximada de {data.solution.maxOrdinate.toFixed(0)} metros.
+                    </p>
+                    <p className="text-xs text-white/70 font-mono leading-relaxed mt-3">
+                      La curva azul representa la trayectoria calculada por el motor balístico RK4 para el reporte de fuego.
+                    </p>
+                  </div>
+                </div>
               </div>
             </Card>
           </TabsContent>
 
-          <TabsContent value="telemetry" className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 outline-none">
+          <TabsContent value="telemetry" className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 outline-none flex-1 min-h-0 overflow-y-auto pr-1 content-start">
             <DataBox label="Sistema de Armas" value={data.weapon} />
             <DataBox label="Carga de Proyección" value={`CHG ${data.charge}`} />
             <DataBox label="Altitud de Impacto" value={`${data.targetAlt} M`} />
@@ -273,6 +317,15 @@ function DataBox({ label, value, color = "text-[#F39C63]" }: { label: string, va
     <div className="bg-black/40 p-4 rounded-2xl border border-[#F39C63]/10 backdrop-blur-sm group hover:border-[#F39C63]/40 transition-all duration-300">
       <span className="text-[9px] text-white/40 uppercase font-black block mb-2 tracking-widest">{label}</span>
       <span className={`text-sm font-mono ${color} font-black`}>{value}</span>
+    </div>
+  );
+}
+
+function TrajectoryMetric({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="bg-[#07110d]/80 border border-white/5 px-3 py-3">
+      <span className="text-[#F39C63] text-xs font-black tracking-wider">{label}: </span>
+      <span className="text-[#F39C63] text-xs font-black tracking-wider">{value}</span>
     </div>
   );
 }
