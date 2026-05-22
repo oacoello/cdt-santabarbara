@@ -6,13 +6,11 @@ import {
   DialogContent,
   DialogHeader,
   DialogTitle,
-  DialogFooter,
 } from '@/components/ui/dialog';
-import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from "@/components/ui/tabs";
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from "@/components/ui/table";
-import { FileText, ArrowRightLeft, ClipboardList, ShieldAlert } from 'lucide-react';
+import { FileText, ArrowRightLeft, ClipboardList, ShieldAlert, X } from 'lucide-react';
 import { type TrajectoryPoint, type FiringSolution } from '@/lib/ballistics';
 import { 
   AreaChart, 
@@ -90,9 +88,17 @@ export function ReportDialog({ isOpen, onClose, data }: ReportDialogProps) {
 
   return (
     <Dialog open={isOpen} onOpenChange={onClose}>
-      <DialogContent className="max-w-6xl h-[85vh] flex flex-col bg-black/95 text-white border border-[#38BDF8]/20 backdrop-blur-2xl rounded-3xl shadow-[0_0_50px_rgba(56,189,248,0.12)] overflow-hidden p-6">
+      <DialogContent className="w-[83vw] max-w-[83vw] h-[83vh] max-h-[83vh] gap-0 flex flex-col bg-black/95 text-white border border-[#38BDF8]/20 backdrop-blur-2xl rounded-2xl shadow-[0_0_50px_rgba(56,189,248,0.12)] overflow-hidden p-2 sm:p-3">
+        <button
+          type="button"
+          onClick={onClose}
+          aria-label="Cerrar reporte"
+          className="absolute right-4 top-4 z-50 rounded-md p-1 text-white/70 transition-colors hover:bg-white/10 hover:text-white"
+        >
+          <X className="h-5 w-5" />
+        </button>
         
-        <DialogHeader className="relative z-10">
+        <DialogHeader className="relative z-10 flex-none">
           <div className="flex items-center gap-3">
             <div className="p-2 bg-[#F39C63]/10 rounded-xl border border-[#F39C63]/30">
               <FileText className="w-5 h-5 text-[#F39C63]" />
@@ -111,8 +117,8 @@ export function ReportDialog({ isOpen, onClose, data }: ReportDialogProps) {
           </div>
         </DialogHeader>
 
-        <Tabs defaultValue="comparison" className="w-full mt-4 relative z-10 flex-1 min-h-0 flex flex-col">
-          <TabsList className="bg-black/60 border border-[#F39C63]/10 p-1 rounded-xl w-full grid grid-cols-3">
+        <Tabs defaultValue="comparison" className="w-full mt-8 relative z-10 flex-1 min-h-0 flex flex-col">
+          <TabsList className="bg-black/60 border border-[#F39C63]/10 p-1 rounded-xl w-full grid grid-cols-3 flex-none">
             <TabsTrigger value="comparison" className="data-[state=active]:bg-[#F39C63] data-[state=active]:text-black text-xs font-black uppercase tracking-wider rounded-lg transition-all">
               <ArrowRightLeft className="w-3.5 h-3.5 mr-1.5" /> Mapeo y Comparación HP-71B
             </TabsTrigger>
@@ -124,7 +130,7 @@ export function ReportDialog({ isOpen, onClose, data }: ReportDialogProps) {
             </TabsTrigger>
           </TabsList>
 
-          <TabsContent value="comparison" className="mt-4 space-y-4 outline-none flex-1 min-h-0 overflow-y-auto pr-1">
+          <TabsContent value="comparison" className="mt-4 space-y-3 outline-none flex-1 min-h-0 overflow-hidden">
             <div className="border border-[#F39C63]/10 rounded-2xl overflow-hidden bg-black/40 backdrop-blur-sm">
               <Table>
                 <TableHeader className="bg-[#F39C63]/5">
@@ -219,14 +225,14 @@ export function ReportDialog({ isOpen, onClose, data }: ReportDialogProps) {
             ) : null}
           </TabsContent>
 
-          <TabsContent value="trajectory" className="mt-4 outline-none flex-1 min-h-0 overflow-y-auto pr-1">
-            <Card className="p-4 bg-[#05080c] border border-[#38BDF8]/20 backdrop-blur-sm rounded-2xl">
-              <div className="grid grid-cols-1 lg:grid-cols-[1.6fr_0.9fr] gap-4">
-                <div className="border border-[#38BDF8]/15 bg-[#061426]/70 rounded-xl p-4">
-                  <div className="text-center text-[#93C5FD] font-black uppercase tracking-[0.22em] text-xs mb-3">
+          <TabsContent value="trajectory" className="mt-4 outline-none flex-1 min-h-0 overflow-hidden">
+            <Card className="h-full min-h-0 p-4 bg-[#05080c] border border-[#38BDF8]/20 backdrop-blur-sm rounded-2xl">
+              <div className="grid h-full min-h-0 grid-cols-1 lg:grid-cols-[1.6fr_0.9fr] gap-4">
+                <div className="h-full min-h-0 flex flex-col border border-[#38BDF8]/15 bg-[#061426]/70 rounded-xl p-4">
+                  <div className="flex-none text-center text-[#93C5FD] font-black uppercase tracking-[0.22em] text-xs mb-3">
                     Trayectoria Táctica
                   </div>
-                  <div className="h-[360px] w-full font-mono text-[10px]">
+                  <div className="flex-1 min-h-0 w-full font-mono text-[10px]">
                     <ResponsiveContainer width="100%" height="100%">
                       <AreaChart data={trajectory} margin={{ top: 10, right: 18, left: 0, bottom: 12 }}>
                         <defs>
@@ -260,8 +266,8 @@ export function ReportDialog({ isOpen, onClose, data }: ReportDialogProps) {
                   </div>
                 </div>
 
-                <div className="space-y-4">
-                  <div className="border border-[#38BDF8]/15 rounded-xl p-4 bg-black/50">
+                <div className="h-full min-h-0 flex flex-col gap-4">
+                  <div className="flex-none border border-[#38BDF8]/15 rounded-xl p-4 bg-black/50">
                     <div className="text-[#F39C63] font-black uppercase tracking-[0.2em] text-xs mb-4">
                       Sistema de Datos Tácticos
                     </div>
@@ -274,7 +280,7 @@ export function ReportDialog({ isOpen, onClose, data }: ReportDialogProps) {
                     </div>
                   </div>
 
-                  <div className="border border-[#38BDF8]/15 rounded-xl p-4 bg-black/50 min-h-[160px]">
+                  <div className="flex-1 min-h-0 border border-[#38BDF8]/15 rounded-xl p-4 bg-black/50">
                     <div className="text-[10px] text-white/60 uppercase mb-3">Explicación</div>
                     <p className="text-xs text-white/80 font-mono leading-relaxed">
                       El proyectil {data.weapon} con carga {data.charge} alcanzó {data.solution.range.toFixed(0)} metros
@@ -289,7 +295,7 @@ export function ReportDialog({ isOpen, onClose, data }: ReportDialogProps) {
             </Card>
           </TabsContent>
 
-          <TabsContent value="telemetry" className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 outline-none flex-1 min-h-0 overflow-y-auto pr-1 content-start">
+          <TabsContent value="telemetry" className="mt-4 grid grid-cols-1 md:grid-cols-3 gap-3 outline-none flex-1 min-h-0 overflow-hidden content-start">
             <DataBox label="Sistema de Armas" value={data.weapon} />
             <DataBox label="Carga de Proyección" value={`CHG ${data.charge}`} />
             <DataBox label="Altitud de Impacto" value={`${data.targetAlt} M`} />
@@ -299,14 +305,6 @@ export function ReportDialog({ isOpen, onClose, data }: ReportDialogProps) {
           </TabsContent>
         </Tabs>
 
-        <DialogFooter className="mt-6 border-t border-[#F39C63]/10 pt-4 flex sm:justify-between items-center gap-4 relative z-10">
-          <div className="text-[10px] text-white/30 font-mono hidden md:block">
-            ID MISIÓN: {data.id} | SECCIÓN DE COMPUTADORES TÁCTICOS
-          </div>
-          <Button onClick={() => window.print()} className="bg-gradient-to-r from-[#F39C63] to-[#e67e22] text-black font-black uppercase text-xs tracking-wider px-6 h-11 rounded-xl shadow-[0_0_20px_rgba(243,156,99,0.3)] hover:opacity-90 transition-all">
-            IMPRIMIR RÉCORD DE TIRO
-          </Button>
-        </DialogFooter>
       </DialogContent>
     </Dialog>
   );
