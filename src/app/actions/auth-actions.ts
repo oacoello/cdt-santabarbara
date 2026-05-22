@@ -15,6 +15,7 @@ export async function createOperator(formData: any) {
     await prisma.user.create({
       data: {
         username,
+        email: `${username}@santabarbara.local`,
         password: hashedPassword,
         rank,
         canUseCalc,

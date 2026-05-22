@@ -1,10 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import dynamic from 'next/dynamic';
 import { TacticalBackground } from '@/components/TacticalBackground';
-
-const TacticalMap = dynamic(() => import('@/components/TacticalMap').then(mod => mod.TacticalMap), { ssr: false });
 import { type LatLng, type WeaponSystem } from '@/lib/ballistics';
 import { Toaster } from '@/components/ui/toaster';
 import { useToast } from '@/hooks/use-toast';
@@ -14,7 +11,6 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Button } from "@/components/ui/button";
-import { TacticalMapMapcn } from '@/components/TacticalMapMapcn';
 
 import { signIn, signOut, useSession } from "next-auth/react";
 import { SimulatorTab } from '@/components/fdc/SimulatorTab';
