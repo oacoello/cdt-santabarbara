@@ -1,12 +1,11 @@
 'use server'
 
-import { PrismaClient } from "@prisma/client"
 import bcrypt from "bcrypt"
-
-const prisma = new PrismaClient()
+import { ensureDatabase, prisma } from "@/lib/prisma"
 
 export async function createOperator(formData: any) {
   const { username, password, rank, canUseCalc, canUseSim } = formData;
+  await ensureDatabase();
   
   // Encrypt password before sending to the cluster
   const hashedPassword = await bcrypt.hash(password, 10);

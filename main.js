@@ -15,6 +15,13 @@ function getResourcesPath() {
   return app.isPackaged ? process.resourcesPath : __dirname;
 }
 
+function getDatabaseUrl() {
+  if (process.env.DATABASE_URL) return process.env.DATABASE_URL;
+
+  const dbPath = path.join(app.getPath('userData'), 'cdt.db').replace(/\\/g, '/');
+  return `file:${dbPath}`;
+}
+
 function waitForServer(url, timeoutMs = 30000) {
   const startedAt = Date.now();
 
@@ -61,6 +68,10 @@ function startNextServer() {
       NODE_ENV: 'production',
       PORT: NEXT_PORT,
       HOSTNAME: '127.0.0.1',
+      DATABASE_URL: getDatabaseUrl(),
+      AUTH_SECRET: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || 'cdt-local-desktop-secret',
+      NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || 'cdt-local-desktop-secret',
+      NEXTAUTH_URL: `http://127.0.0.1:${NEXT_PORT}`,
       HP71_BACKEND_URL: `http://127.0.0.1:${HP71_PORT}`,
     },
     stdio: 'ignore',
@@ -93,11 +104,20 @@ function startHp71Server() {
     return;
   }
 
+  if (process.platform !== 'win32') {
+    try {
+      fs.chmodSync(executablePath, 0o755);
+    } catch {
+      // If chmod fails, spawn will surface the real execution error below.
+    }
+  }
+
   hp71Process = spawn(executablePath, [], {
     cwd: path.dirname(executablePath),
     env: {
       ...process.env,
       PORT: HP71_PORT,
+      CDT_HP71_HEADLESS: '1',
     },
     stdio: 'ignore',
     windowsHide: true,

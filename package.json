@@ -16,15 +16,18 @@
     "typecheck": "tsc --noEmit",
     "dist": "npm run build:web && electron-builder --win --linux",
     "postinstall": "prisma generate",
-    "build:web": "next build && node scripts/prepare-electron-assets.js",
+    "build:hp71:linux": "cmake -S HP71 -B HP71/build -DCMAKE_BUILD_TYPE=Release && cmake --build HP71/build --target hp71_emulator && mkdir -p HP71/dist/linux && cp HP71/build/hp71_server/hp71_emulator HP71/dist/linux/hp71_emulator && chmod +x HP71/dist/linux/hp71_emulator",
+    "build:web": "prisma generate && next build && node scripts/prepare-electron-assets.js",
     "dist:win": "npm run build:web && electron-builder --win",
-    "dist:linux": "npm run build:web && electron-builder --linux"
+    "dist:linux": "npm run build:web && electron-builder --linux",
+    "db:push": "prisma db push",
+    "db:seed": "prisma db seed"
   },
   "prisma": {
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
   },
   "dependencies": {
-    "@auth/prisma-adapter": "^2.11.2",
+    "@prisma/adapter-better-sqlite3": "^7.8.0",
     "@prisma/client": "^7.8.0",
     "@radix-ui/react-accordion": "^1.2.3",
     "@radix-ui/react-alert-dialog": "^1.1.6",
@@ -79,7 +82,12 @@
     },
     "files": [
       "main.js",
-      "package.json"
+      "package.json",
+      "!node_modules/**",
+      "!.next/**",
+      "!src/**",
+      "!HP71/build/**",
+      "!release/**"
     ],
     "extraResources": [
       {
@@ -120,6 +128,12 @@
       ],
       "category": "Utility",
       "artifactName": "${productName}-${version}-Linux-${arch}.${ext}"
+    },
+    "npmRebuild": false,
+    "compression": "normal",
+    "extraMetadata": {
+      "main": "main.js",
+      "dependencies": {}
     }
   }
 }

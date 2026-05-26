@@ -1,15 +1,10 @@
 // src/auth.ts
 import NextAuth from "next-auth";
 import Credentials from "next-auth/providers/credentials";
-import { PrismaAdapter } from "@auth/prisma-adapter";
-import { PrismaClient } from "@prisma/client";
 import bcrypt from "bcrypt";
-
-// Simplified initialization for Prisma 7
-const prisma = new PrismaClient();
+import { ensureDatabase, prisma } from "@/lib/prisma";
 
 export const { handlers, signIn, signOut, auth } = NextAuth({
-  adapter: PrismaAdapter(prisma),
   session: { strategy: "jwt" }, // Optimizado para la velocidad de la interfaz táctica
   providers: [
     Credentials({
@@ -21,6 +16,7 @@ export const { handlers, signIn, signOut, auth } = NextAuth({
       },
       async authorize(credentials) {
         if (!credentials?.username || !credentials?.password) return null;
+        await ensureDatabase();
 
         // Búsqueda del operador en la base de datos del clúster
         const user = await prisma.user.findUnique({
