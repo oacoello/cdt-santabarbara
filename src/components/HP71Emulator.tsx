@@ -183,8 +183,13 @@ async function fetchHp71Display(command: string): Promise<string> {
   return json.display || "";
 }
 
+type HP71EmulatorProps = {
+  userName?: string;
+  logSessionId?: string;
+};
+
 // ---------- Componente principal ----------
-export default function HP71Emulator() {
+export default function HP71Emulator({ userName = "sin-perfil", logSessionId = "session" }: HP71EmulatorProps) {
   const [screenText, setScreenText] = useState("SANTA BARBARA");
   const [buffer, setBuffer] = useState("");
   const [loading, setLoading] = useState(false);
@@ -217,12 +222,12 @@ export default function HP71Emulator() {
       await fetch('/api/hp71/log', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ type, content }),
+        body: JSON.stringify({ type, content, user: userName, sessionId: logSessionId }),
       });
     } catch (err) {
       console.error('Error logging event:', err);
     }
-  }, []);
+  }, [userName, logSessionId]);
 
   // ---------- Envío de comandos al servidor ----------
   const sendCommand = useCallback(async (command: string, preferredBasePieceNumber = basePieceNumber) => {
@@ -417,7 +422,7 @@ export default function HP71Emulator() {
 
       <div className="flex flex-col items-center gap-2 max-w-full w-[1100px]">
         <a
-          href="/hp71_log.txt"
+          href={`/api/hp71/log?user=${encodeURIComponent(userName)}&sessionId=${encodeURIComponent(logSessionId)}`}
           target="_blank"
           className="h-10 px-6 rounded-xl border-2 border-[#F39C63] bg-[#0A0A0B]/60 text-[#F39C63] hover:bg-[#F39C63] hover:text-black transition-all flex items-center justify-center text-[11px] font-black uppercase tracking-[0.2em] shadow-2xl"
         >

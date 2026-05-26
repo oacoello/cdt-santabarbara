@@ -17,12 +17,34 @@ import { SimulatorTab } from '@/components/fdc/SimulatorTab';
 import { ReportDialog } from '@/components/ReportDialog';
 import { computeFiringSolution, getMuzzleVelocity, simulateTrajectory } from '@/lib/ballistics';
 import HP71Emulator from '@/components/HP71Emulator';
+import { HP71ReportsTab } from '@/components/HP71ReportsTab';
 
 export default function SantaBarbaraFDC() {
   const { toast } = useToast();
   const { data: session } = useSession();
   const loggedUser = session?.user;
   const [activeTab, setActiveTab] = useState("sim");
+  const [logSessionId, setLogSessionId] = useState("");
+
+
+  useEffect(() => {
+    setLogSessionId(`hp71-${new Date().toISOString().replace(/[:.]/g, "-")}-${Math.random().toString(36).slice(2, 8)}`.toLowerCase());
+  }, []);
+
+  useEffect(() => {
+    if (!loggedUser?.name || !logSessionId) return;
+
+    fetch('/api/hp71/log', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        type: 'SYSTEM',
+        content: 'NUEVA SESIÓN CDT',
+        user: loggedUser.name,
+        sessionId: logSessionId,
+      }),
+    }).catch((error) => console.error('Error iniciando log de sesión:', error));
+  }, [loggedUser?.name, logSessionId]);
 
   // Estados del Formulario de Login
   const [loginUsername, setLoginUsername] = useState("");
@@ -193,6 +215,12 @@ export default function SantaBarbaraFDC() {
               <span className="material-symbols-rounded text-sm mr-2">calculate</span> Calculadora
             </TabsTrigger>
             <TabsTrigger
+              value="reports"
+              className="px-6 uppercase text-[11px] font-black tracking-[0.2em] h-full transition-all data-[state=active]:text-[#F39C63]"
+            >
+              <span className="material-symbols-rounded text-sm mr-2">assignment</span> Reportes
+            </TabsTrigger>
+            <TabsTrigger
               value="staff"
               className="px-6 uppercase text-[11px] font-black tracking-[0.2em] h-full transition-all data-[state=active]:text-[#F39C63]"
             >
@@ -223,7 +251,11 @@ export default function SantaBarbaraFDC() {
 
           {/* ... resto de los TabsContent (manual y staff) se mantienen igual ... */}
           <TabsContent value="manual" className="h-full w-full m-0 border-none bg-transparent data-[state=active]:flex items-center justify-center p-8 lg:p-20">
-            <HP71Emulator />
+            <HP71Emulator userName={loggedUser?.name ?? undefined} logSessionId={logSessionId} />
+          </TabsContent>
+
+          <TabsContent value="reports" className="h-full w-full m-0 border-none bg-transparent data-[state=active]:block">
+            <HP71ReportsTab userName={loggedUser?.name ?? undefined} currentSessionId={logSessionId} />
           </TabsContent>
 
           <TabsContent value="staff" className="h-full w-full m-0 border-none bg-transparent data-[state=active]:flex items-center justify-center p-6">
@@ -265,7 +297,7 @@ export default function SantaBarbaraFDC() {
                     disabled={isAuthenticating}
                     className="w-full bg-[#F39C63] hover:bg-[#F39C63]/90 text-black font-black uppercase h-12 tracking-widest"
                   >
-                    {isAuthenticating ? "Sincronizando..." : "Vincular Terminal"}
+                    {isAuthenticating ? "Verificando..." : "Iniciar sesión"}
                   </Button>
                 </form>
               ) : (

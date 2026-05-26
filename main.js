@@ -69,6 +69,7 @@ function startNextServer() {
       PORT: NEXT_PORT,
       HOSTNAME: '127.0.0.1',
       DATABASE_URL: getDatabaseUrl(),
+      CDT_DATA_DIR: app.getPath('userData'),
       AUTH_SECRET: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || 'cdt-local-desktop-secret',
       NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || 'cdt-local-desktop-secret',
       NEXTAUTH_URL: `http://127.0.0.1:${NEXT_PORT}`,
