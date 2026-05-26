@@ -10,6 +10,7 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 
 const MAPTILER_KEY = 'VRmMIQ93urJL9gK2BcI1'; 
 const MAP_STYLE = `https://api.maptiler.com/maps/outdoor-v2-dark/style.json?key=${MAPTILER_KEY}`;
+const FIRST_ARTILLERY_BATTALION: LatLng = { lat: 14.25806, lng: -87.42981 };
 
 interface TacticalMapProps {
   gunPosition: LatLng | null;
@@ -215,6 +216,15 @@ export function TacticalMapMapcn({
     updateMarker('gun', gunPosition, `
       <div class="w-8 h-8 bg-blue-500/20 border-2 border-blue-500 rounded-full flex items-center justify-center backdrop-blur-sm shadow-[0_0_15px_rgba(59,130,246,0.5)]">
         <div class="w-2 h-2 bg-blue-500 rounded-full"></div>
+      </div>`);
+
+    updateMarker('first-artillery-battalion', FIRST_ARTILLERY_BATTALION, `
+      <div title="1er Batallón de Artillería" class="relative flex items-center justify-center">
+        <div class="absolute w-10 h-10 bg-blue-500/20 border-2 border-blue-400 rounded-full shadow-[0_0_18px_rgba(59,130,246,0.75)]"></div>
+        <div class="w-3 h-3 bg-blue-400 rounded-full border border-white/80"></div>
+        <div class="absolute top-6 whitespace-nowrap rounded bg-black/75 px-2 py-0.5 text-[10px] font-black tracking-widest text-blue-300 border border-blue-400/50">
+          1 BA
+        </div>
       </div>`);
 
     updateMarker('target', targetPosition, `
