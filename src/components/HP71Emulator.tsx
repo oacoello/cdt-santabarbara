@@ -141,10 +141,46 @@ function getVisibleLcdLines(text: string, preferStart: boolean): [string, string
     return [relevantLines[0] ?? "", relevantLines[1] ?? ""];
   }
 
-  return [
-    relevantLines[Math.max(0, relevantLines.length - 2)] ?? "",
-    relevantLines[Math.max(0, relevantLines.length - 1)] ?? "",
-  ];
+  if (relevantLines.length <= 1) {
+    return [relevantLines[0] ?? "", ""];
+  }
+
+  const last = relevantLines[relevantLines.length - 1] ?? "";
+  const beforeLast = relevantLines[relevantLines.length - 2] ?? "";
+
+  if (last.trim() === ">" && beforeLast.trim().endsWith(">")) {
+    return [beforeLast, ""];
+  }
+
+  return [beforeLast, last];
+}
+
+function ensureSinglePrompt(text: string): string {
+  const clean = text.replace(/\s+$/g, "");
+  if (/>$/.test(clean)) return clean;
+  return `${clean}\n>`;
+}
+
+async function fetchHp71Display(command: string): Promise<string> {
+  const encoded = encodeURIComponent(command);
+
+  if (process.env.NODE_ENV === "development") {
+    try {
+      const directRes = await fetch("http://127.0.0.1:8080/input", {
+        method: "POST",
+        headers: { "Content-Type": "application/x-www-form-urlencoded" },
+        body: `cmd=${encoded}`,
+      });
+
+      if (directRes.ok) return await directRes.text();
+    } catch {
+      // Fall back to the Next proxy below.
+    }
+  }
+
+  const proxyRes = await fetch(`/api/hp71?cmd=${encoded}`, { method: "POST" });
+  const json = await proxyRes.json();
+  return json.display || "";
 }
 
 // ---------- Componente principal ----------
@@ -193,9 +229,7 @@ export default function HP71Emulator() {
     if (!command.trim() || loading) return;
     setLoading(true);
     try {
-      const res = await fetch(`/api/hp71?cmd=${encodeURIComponent(command)}`, { method: "POST" });
-      const json = await res.json();
-      const responseText: string = json.display || "";
+      const responseText = await fetchHp71Display(command);
       let nextBasePieceNumber = preferredBasePieceNumber;
 
       // Lógica nueva para pieza base
@@ -235,7 +269,7 @@ export default function HP71Emulator() {
       } else {
         setPieces([]);
         setPieceMode(false);
-        setScreenText(responseText + "\n> ");
+        setScreenText(ensureSinglePrompt(responseText));
         setPromptVisible(true);
       }
     } catch (error) {
@@ -279,7 +313,11 @@ export default function HP71Emulator() {
       // Tecla ENTER → envía el comando acumulado o "MAIN"
       if (key === "ENTER") {
         const cmd = buffer.trim();
-        if (cmd === "") return;
+        if (cmd === "") {
+          sendCommand("MAIN");
+          logEvent('INPUT', 'USUARIO: MAIN');
+          return;
+        }
         let preferredBasePieceNumber = basePieceNumber;
         if (waitingBasePiece && /^\d+$/.test(cmd) && parseInt(cmd, 10) > 0) {
           preferredBasePieceNumber = parseInt(cmd, 10);
@@ -354,7 +392,7 @@ export default function HP71Emulator() {
   const lcdContent = pieceMode && pieces.length > 0
     ? pieces[pieceIndex]?.text ?? ""
     : promptVisible
-    ? screenText + buffer
+    ? `${screenText}${buffer}`
     : screenText;
 
   const visibleLcdLines = getVisibleLcdLines(lcdContent, pieceMode);
@@ -377,38 +415,42 @@ export default function HP71Emulator() {
         }
       `}} />
 
-      <div className="relative bg-[#1a1a1a] p-[10px] sm:p-[14px] rounded-[20px] shadow-[0_35px_80px_-15px_rgba(0,0,0,0.95)] border-[4px] border-[#101011] border-b-[12px] max-w-full w-[940px]">
-        <div className="absolute right-4 top-4 z-30">
-          <a href="/hp71_log.txt" target="_blank" className="text-[#29f3ff] text-xs underline hover:text-white">
-            LOG
-          </a>
-        </div>
+      <div className="flex flex-col items-center gap-2 max-w-full w-[1100px]">
+        <a
+          href="/hp71_log.txt"
+          target="_blank"
+          className="h-10 px-6 rounded-xl border-2 border-[#F39C63] bg-[#0A0A0B]/60 text-[#F39C63] hover:bg-[#F39C63] hover:text-black transition-all flex items-center justify-center text-[11px] font-black uppercase tracking-[0.2em] shadow-2xl"
+        >
+          Historial
+        </a>
+
+      <div className="relative bg-[#6F6F6F] p-[10px] sm:p-[14px] rounded-[20px] shadow-[0_35px_80px_-15px_rgba(0,0,0,0.95)] border-[4px] border-[#101011] border-b-[12px] max-w-full w-full">
 
         <div className="relative h-[175px] w-full select-none overflow-hidden">
           <div
-            className="absolute inset-0 bg-[#121212] rounded-t-[8px]"
+            className="absolute inset-0 bg-[#6F6F6F] rounded-t-[8px]"
             style={{ clipPath: "polygon(0 0, 100% 0, 100% 169px, 64% 169px, 64% 137px, 0 137px)" }}
           />
 
           <div
-            className="absolute inset-0 bg-gradient-to-b from-[#e8e8e8] via-[#cfcfcf] to-[#adadad] rounded-t-[8px] shadow-[inset_1px_1px_1px_rgba(255,255,255,0.4)]"
+            className="absolute inset-0 bg-[#CBBF97] rounded-t-[8px] shadow-[inset_1px_1px_1px_rgba(255,255,255,0.4)]"
             style={{ clipPath: "polygon(0 0, 100% 0, 100% 157px, 64% 157px, 64% 135px, 0 135px)" }}
           />
 
           <div className="absolute inset-0 flex z-20">
             <div className="w-[64%] h-[135px] flex items-center px-4 pr-6">
-              <div className="relative bg-[#7d8671] p-[4px] rounded border-2 border-[#52594a] shadow-[inset_2px_2px_6px_rgba(0,0,0,0.65)] w-full h-[106px] flex items-center overflow-hidden">
+              <div className="relative bg-[#1F1F1F] p-[4px] rounded border-2 border-[#52594a] shadow-[inset_2px_2px_6px_rgba(0,0,0,0.65)] w-full h-[106px] flex items-center overflow-hidden">
                 <div className="absolute inset-0 lcd-grid-overlay pointer-events-none" />
                 <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-transparent to-black/5 pointer-events-none" />
 
                 <div className="relative w-full h-full px-4 py-2 flex flex-col justify-around overflow-hidden z-10">
-                  <div className="retro-lcd-font text-[#181d15] text-[20px] sm:text-[25px] flex flex-col w-full h-full justify-around tracking-[0.08em] uppercase select-none leading-none">
+                  <div className="retro-lcd-font text-[#BAFF7C] text-[20px] sm:text-[25px] flex flex-col w-full h-full justify-around tracking-[0.08em] uppercase select-none leading-none">
                     <div className="opacity-85 overflow-hidden whitespace-nowrap">
                       {visibleLcdLines[0]}
                     </div>
                     <div className="flex items-center overflow-hidden whitespace-nowrap">
                       <span>{visibleLcdLines[1]}</span>
-                      <span className={`inline-block w-[10px] h-[18px] bg-[#1a1a1a]/85 ml-[2px] ${loading ? "animate-pulse" : ""}`} />
+                      <span className={`inline-block w-[10px] h-[18px] bg-[#BAFF7C] ml-[2px] ${loading ? "animate-pulse" : ""}`} />
                     </div>
                   </div>
                 </div>
@@ -418,14 +460,13 @@ export default function HP71Emulator() {
             <div className="w-[36%] h-[157px] flex flex-col justify-between py-3.5 px-4">
               <div className="bg-[#121212] p-1.5 rounded border border-[#444] shadow-[inset_0_1px_2px_rgba(0,0,0,0.7)] flex items-center gap-2 w-full h-11 self-start">
                 <div className="bg-[#dfdfdf] rounded-sm p-[1px] w-6 h-6 flex items-center justify-center border border-black shadow-sm">
-                  <span className="text-black font-serif font-black italic text-[11px] leading-none tracking-tighter">hp</span>
+                  <span className="text-black font-sans font-black text-[10px] leading-none tracking-tighter">C</span>
                 </div>
                 <div className="flex flex-col text-left">
-                  <span className="text-[#dfdfdf] font-sans font-black tracking-[0.08em] text-[7px] leading-tight">HEWLETT</span>
-                  <span className="text-[#dfdfdf] font-sans font-black tracking-[0.08em] text-[7px] leading-none">PACKARD</span>
+                  <span className="text-[#dfdfdf] font-sans font-black tracking-[0.08em] text-[11px] leading-none">C.O.R.Z</span>
                 </div>
                 <div className="ml-auto flex items-end h-full pb-[1px]">
-                  <span className="text-[#c5a059] font-sans font-black tracking-wide text-[14px] leading-none shadow-sm">71B</span>
+                  <span className="text-[#c5a059] font-sans font-black tracking-wide text-[14px] leading-none shadow-sm">V-IMM</span>
                 </div>
               </div>
 
@@ -436,7 +477,7 @@ export default function HP71Emulator() {
           </div>
         </div>
 
-        <div className="px-2 py-4 sm:px-4 sm:py-5 bg-[#181818] rounded-b-lg shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
+        <div className="px-2 py-4 sm:px-4 sm:py-5 bg-[#6F6F6F] rounded-b-lg shadow-[inset_0_1px_0_rgba(255,255,255,0.05)]">
           <div className="flex flex-col md:flex-row gap-2 items-start overflow-x-auto">
             <div className="grid grid-cols-10 gap-x-[1px] sm:gap-x-[2px] gap-y-1.5 flex-1">
               {[{k:"Q", t:"IF"}, {k:"W", t:"THEN"}, {k:"E", t:"ELSE"}, {k:"R", t:"FOR"}, {k:"T", t:"TO"}, {k:"Y", t:"NEXT"}, {k:"U", t:"DEF"}, {k:"I", t:"KEY"}, {k:"O", t:"ADD"}, {k:"P", t:"LR"}].map(x => <CalcKey key={x.k} label={x.k} topLabel={x.t} onClick={handleKeyPress} data={x.k} />)}
@@ -479,6 +520,7 @@ export default function HP71Emulator() {
             </div>
           </div>
         </div>
+      </div>
       </div>
     </div>
   );

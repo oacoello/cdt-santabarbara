@@ -2,12 +2,20 @@
 #include <fstream>
 #include <sstream>
 #include <thread>
-#include <conio.h>   // 🔥 CLAVE (_getch)
 #include "httplib.h"
 #include "basic_engine.h"
 #include <filesystem>
-#include <windows.h>
 #include <vector>
+#include <cstdlib>
+#include <cstdio>
+
+#ifdef _WIN32
+#include <conio.h>   // 🔥 CLAVE (_getch)
+#include <windows.h>
+#else
+#include <unistd.h>
+#include <limits.h>
+#endif
 
 
 BasicEngine engine;
@@ -24,7 +32,17 @@ void runServer()
     {
         std::string cmd = req.get_param_value("cmd");
         std::string result = engine.execute(cmd);
+        res.set_header("Access-Control-Allow-Origin", "*");
+        res.set_header("Access-Control-Allow-Headers", "Content-Type");
         res.set_content(result,"text/plain");
+    });
+
+    server.Options("/input", [](const httplib::Request&, httplib::Response& res)
+    {
+        res.set_header("Access-Control-Allow-Origin", "*");
+        res.set_header("Access-Control-Allow-Methods", "POST, OPTIONS");
+        res.set_header("Access-Control-Allow-Headers", "Content-Type");
+        res.status = 204;
     });
 
     server.Get("/", [](const httplib::Request&, httplib::Response& res)
@@ -34,8 +52,23 @@ void runServer()
         std::ifstream file;
 
         // 🔥 obtener ruta REAL del exe
-        char exePath[MAX_PATH];
+        char exePath[4096] = {0};
+
+#ifdef _WIN32
         GetModuleFileNameA(NULL, exePath, MAX_PATH);
+#else
+        ssize_t len = readlink("/proc/self/exe", exePath, sizeof(exePath) - 1);
+        if (len <= 0)
+        {
+            std::filesystem::path fallback = std::filesystem::current_path() / "hp71_emulator";
+            std::string fallbackStr = fallback.string();
+            std::snprintf(exePath, sizeof(exePath), "%s", fallbackStr.c_str());
+        }
+        else
+        {
+            exePath[len] = '\0';
+        }
+#endif
 
         // carpeta del exe
         std::filesystem::path exeDir = std::filesystem::path(exePath).parent_path();
@@ -86,6 +119,37 @@ void runServer()
 
 void runConsole()
 {
+#ifndef _WIN32
+    std::string input;
+
+    std::cout << engine.execute("*") << std::endl;
+
+    while(true)
+    {
+        std::cout << "> ";
+        if(!std::getline(std::cin, input))
+            break;
+
+        if(input == "EXIT" || input == "exit")
+        {
+            std::cout << "Closing console...\n";
+            break;
+        }
+
+        if(input.empty())
+            continue;
+
+        try
+        {
+            std::string result = engine.execute(input);
+            std::cout << result << std::endl;
+        }
+        catch(const std::exception& e)
+        {
+            std::cout << "ERROR: " << e.what() << std::endl;
+        }
+    }
+#else
     std::string input;
 
     std::cout << engine.execute("*") << std::endl;
@@ -172,6 +236,7 @@ void runConsole()
             std::cout << "ERROR: " << e.what() << std::endl;
         }
     }
+#endif
 }
 
 //////////////////////////////////////////////////
@@ -183,6 +248,14 @@ int main()
     std::cout << "Starting HP-71B Artillery System...\n";
 
     engine.resetData(); // <- esto inicializa TODO y carga TABLAS de una vez
+
+    const char* headless = std::getenv("CDT_HP71_HEADLESS");
+    if(headless && std::string(headless) == "1")
+    {
+        runServer();
+        return 0;
+    }
+
     std::thread server_thread(runServer);
     std::thread console_thread(runConsole);
 

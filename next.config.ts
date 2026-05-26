@@ -1,10 +1,8 @@
 import type { NextConfig } from 'next';
 
 const nextConfig: NextConfig = {
-  // output: 'export', 
-  distDir: 'out',
-  trailingSlash: true,
-  assetPrefix: './', 
+  output: 'standalone',
+  devIndicators: false,
 
   typescript: {
     ignoreBuildErrors: false,
