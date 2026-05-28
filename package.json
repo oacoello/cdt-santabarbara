@@ -5,7 +5,7 @@
   "main": "main.js",
   "scripts": {
     "dev": "next dev --turbopack -p 9002",
-    "dev:server": "cmake -S HP71 -B HP71\\build && cmake --build HP71\\build --config Debug --target hp71_emulator && start /D HP71 /B build\\hp71_server\\Debug\\hp71_emulator.exe",
+    "dev:server": "node scripts/dev-hp71-server.js",
     "dev:all": "npm run dev:server && npm run dev",
     "electron": "electron .",
     "dev:electron": "npm run dev",
