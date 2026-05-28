@@ -403,7 +403,7 @@ export default function HP71Emulator({ userName = "sin-perfil", logSessionId = "
   const visibleLcdLines = getVisibleLcdLines(lcdContent, pieceMode);
 
   return (
-    <div className="min-h-screen bg-[#0d0d0f] text-gray-100 flex items-center justify-center p-4 sm:p-6 overflow-x-auto">
+    <div className="h-full w-full bg-[#0d0d0f] text-gray-100 flex items-center justify-center p-4 sm:p-6 overflow-x-auto">
       <style dangerouslySetInnerHTML={{__html: `
         @import url('https://fonts.googleapis.com/css2?family=WDXL+Lubrifont+JP+N:wght@400;700;900&display=swap');
 

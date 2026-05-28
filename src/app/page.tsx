@@ -1,6 +1,7 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
+import dynamic from 'next/dynamic';
 import { TacticalBackground } from '@/components/TacticalBackground';
 import { type LatLng, type WeaponSystem } from '@/lib/ballistics';
 import { Toaster } from '@/components/ui/toaster';
@@ -18,6 +19,12 @@ import { ReportDialog } from '@/components/ReportDialog';
 import { computeFiringSolution, getMuzzleVelocity, simulateTrajectory } from '@/lib/ballistics';
 import HP71Emulator from '@/components/HP71Emulator';
 import { HP71ReportsTab } from '@/components/HP71ReportsTab';
+import { ProfileManager } from '@/components/ProfileManager';
+
+const TacticalMap = dynamic(
+  () => import("@/components/TacticalMapMapcn").then((mod) => mod.TacticalMapMapcn),
+  { ssr: false }
+);
 
 export default function SantaBarbaraFDC() {
   const { toast } = useToast();
@@ -249,9 +256,36 @@ export default function SantaBarbaraFDC() {
             />
           </TabsContent>
 
-          {/* ... resto de los TabsContent (manual y staff) se mantienen igual ... */}
-          <TabsContent value="manual" className="h-full w-full m-0 border-none bg-transparent data-[state=active]:flex items-center justify-center p-8 lg:p-20">
-            <HP71Emulator userName={loggedUser?.name ?? undefined} logSessionId={logSessionId} />
+          {/* CALCULADORA */}
+          <TabsContent value="manual" forceMount className="h-full w-full m-0 border-none bg-transparent data-[state=inactive]:hidden p-4">
+            <div className="grid h-full min-h-0 grid-cols-1 xl:grid-cols-[minmax(0,1.15fr)_minmax(420px,0.85fr)] gap-4">
+              <div className="min-h-0 flex items-center justify-center overflow-auto">
+                <HP71Emulator userName={loggedUser?.name ?? undefined} logSessionId={logSessionId} />
+              </div>
+
+              <div className="min-h-[320px] xl:min-h-0 rounded-xl overflow-hidden border border-border bg-background relative">
+                <TacticalMap
+                  gunPosition={gunPosition}
+                  targetPosition={targetPosition}
+                  mapCenter={mapCenter}
+                  impacts={[]}
+                  onSetTarget={(coord) => { setTargetPosition(coord); setLastTrajectory(null); }}
+                  onSetGun={(coord) => { setGunPosition(coord); setIsGunLocated(true); setLastTrajectory(null); }}
+                  onLocateGun={() => {
+                    setGunPosition(mapCenter);
+                    setIsGunLocated(true);
+                    setLastTrajectory(null);
+                  }}
+                  onCenterChange={setMapCenter}
+                  realLatLng={null}
+                  isFiring={isFiring}
+                  showExplosion={showExplosion}
+                  fireProgress={fireProgress}
+                  isGunLocated={isGunLocated}
+                  mapModelBounds={mapModelBounds}
+                />
+              </div>
+            </div>
           </TabsContent>
 
           <TabsContent value="reports" className="h-full w-full m-0 border-none bg-transparent data-[state=active]:block">
@@ -260,7 +294,7 @@ export default function SantaBarbaraFDC() {
 
           <TabsContent value="staff" className="h-full w-full m-0 border-none bg-transparent data-[state=active]:flex items-center justify-center p-6">
              {/* Contenido del Login Card */}
-             <Card className="p-8 bg-[#1a1a1a]/80 backdrop-blur-xl border-white/5 shadow-2xl w-full max-w-md border-t-2 border-t-[#F39C63]">
+             <Card className="p-8 bg-[#1a1a1a]/80 backdrop-blur-xl border-white/5 shadow-2xl w-full max-w-2xl max-h-[88vh] overflow-auto border-t-2 border-t-[#F39C63]">
               {!loggedUser ? (
                 <form onSubmit={handleLogin} className="space-y-6">
                   <div className="text-center space-y-1 mb-8">
@@ -330,6 +364,8 @@ export default function SantaBarbaraFDC() {
                         <p className="text-[10px] font-black text-white">{loggedUser.canUseCalc ? 'HABILITADO' : 'CERRADO'}</p>
                      </div>
                   </div>
+
+                  <ProfileManager enabled={session?.user?.role === 'SUPERADMIN'} />
 
                   <Button
                     onClick={() => signOut()}

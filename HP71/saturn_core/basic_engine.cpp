@@ -20,6 +20,11 @@ double BasicEngine::obs_gz = 0;
 #include <algorithm>
 #include <cctype>
 
+
+#ifndef _WIN32
+#include <unistd.h>
+#endif
+
 static std::string normStr(std::string s)
 {
     // 🔥 eliminar caracteres basura (ENTER, TAB, etc)
@@ -929,6 +934,18 @@ static int fm1_temp_knpt = 0;
 static double fm1_temp_e = 0.0;
 static double fm1_temp_n = 0.0;
 static double fm1_temp_alt = 0.0;
+static bool fm1_base_def_reverse = false;
+static bool active_fm1_def_reverse = false;
+static bool active_fm1_transport_qe_shape = false;
+
+// FM1 GRID / TGT1 CLEAN FIRE
+static bool fm1_grid_clean_fire_pending = false;
+static double fm1_grid_reg_dist_backup = 0.0;
+static double fm1_grid_reg_def_backup = 0.0;
+static double fm1_grid_df_corr_backup = 0.0;
+static double fm1_grid_time_reg_correction_backup = 0.0;
+static bool fm1_grid_ud_active_backup = false;
+static double fm1_grid_ud_corr_backup = 0.0;
 
 //////////////////////////////////////////////////
 // FM1 POLAR VARIABLES
@@ -1012,6 +1029,7 @@ static std::string last_lot = "";
 static bool last_fuze_tia = false;
 static double last_reg_rg = 0.0;
 static double last_reg_def = 0.0;
+static bool time_reg_fuze_temporary = false;
 
 //////////////////////////////////////////////////
 // INTERPOLACION
@@ -1308,6 +1326,48 @@ std::string BasicEngine::execute(const std::string& input)
 
         // 🔥 PRIMERO resolver balística
         bool solved = solve(ammo_proj_prop, dist, chg, qe, tof, drift);
+
+        // =====================================================
+        // 🔥 MODULACIÓN QE SOLO PARA FM1 TRANSPORT / TGT2
+        // =====================================================
+        if(active_fm1_transport_qe_shape &&
+           artillery_type == "155" &&
+           (ammo_proj_prop == "HEA" || ammo_proj_prop == "M4A2") &&
+           chg == 6)
+        {
+            double mid_factor = 0.0;
+
+            if(dist >= 9900.0 && dist < 10400.0)
+            {
+                auto smooth = [](double edge0, double edge1, double x) -> double
+                {
+                    if(edge0 == edge1)
+                        return 0.0;
+
+                    double t = (x - edge0) / (edge1 - edge0);
+
+                    if(t < 0.0) t = 0.0;
+                    if(t > 1.0) t = 1.0;
+
+                    return t * t * (3.0 - 2.0 * t);
+                };
+
+                if(dist < 10050.0)
+                {
+                    mid_factor = smooth(9900.0, 10050.0, dist);
+                }
+                else if(dist <= 10300.0)
+                {
+                    mid_factor = 1.0;
+                }
+                else
+                {
+                    mid_factor = 1.0 - smooth(10300.0, 10400.0, dist);
+                }
+            }
+
+            qe *= 1.0 - (0.0284 * mid_factor);
+        }
         
         // ================================
         // 🔥 DRIFT SINTÉTICO (SI TABLA = 0)
@@ -1316,30 +1376,58 @@ std::string BasicEngine::execute(const std::string& input)
         {
             drift = 0.00038 * dist;  // factor realista artillería 155
         }
-        // 🔥 AHORA sí calcular DEF correctamente
-        double def = def_base + (mils - az_lay);
 
-        // aplicar correcciones
-        def += reg_def + df_corr;
+        // 🔥 AHORA sí calcular DEF correctamente
+
+        bool use_fm1_reverse = fm1_base_def_reverse || active_fm1_def_reverse;
+
+        double def = 0.0;
+
+        if(use_fm1_reverse)
+            def = def_base - (mils - az_lay);
+        else
+            def = def_base + (mils - az_lay);
+
+        if(!use_fm1_reverse)
+            def += reg_def + df_corr;
 
         // ================================
         // 🔥 MÓDULO DEF FÍSICO MEJORADO
         // ================================
 
         // ================================
-        // 🔥 DEFLEXIÓN ACUMULADA (TIPO ARES)
+        // 🔥 DEFLEXIÓN ACUMULADA 
         // ================================
 
-        // drift proporcional al tiempo de vuelo (clave real)
         double drift_accum = drift * (tof / 25.0);
-
-        // jump horizontal
         double jump_h = 0.3;
 
-        // aplicar
+        if(use_fm1_reverse)
+        {
+            drift_accum = 0.0;
+            jump_h = 0.0;
+        }
+
+        if((int)i == base_piece_index)
+        {
+            std::cout << "\n[DEF DEBUG BASE PIECE]\n";
+            std::cout << "MENU=" << current_menu << "\n";
+            std::cout << "AZ=" << mils << "\n";
+            std::cout << "AZ_LAY=" << az_lay << "\n";
+            std::cout << "REF_DEF=" << def_base << "\n";
+            std::cout << "DEF_BEFORE_CORR=" << (def_base + (mils - az_lay)) << "\n";
+            std::cout << "REG_DEF=" << reg_def << "\n";
+            std::cout << "DF_CORR=" << df_corr << "\n";
+            std::cout << "DRIFT=" << drift << "\n";
+            std::cout << "TOF=" << tof << "\n";
+            std::cout << "DRIFT_ACCUM=" << drift_accum << "\n";
+            std::cout << "JUMP_H=" << jump_h << "\n";
+            std::cout << "DEF_BEFORE_ROUND=" << (def + drift_accum + jump_h) << "\n";
+            std::cout << "[/DEF DEBUG BASE PIECE]\n\n";
+        }
+
         def += drift_accum;
         def += jump_h;
-
         // 🔥 REDONDEO HP71
         def = std::round(def);
 
@@ -1459,12 +1547,26 @@ std::string BasicEngine::execute(const std::string& input)
 
         if(solved_ref)
         {
-            double def_ref = def_base + (mils - az_lay);
+        bool use_fm1_reverse_ref = fm1_base_def_reverse || active_fm1_def_reverse;
 
+        double def_ref = 0.0;
+
+        if(use_fm1_reverse_ref)
+            def_ref = def_base - (mils - az_lay);
+        else
+            def_ref = def_base + (mils - az_lay);
+
+        if(!use_fm1_reverse_ref)
             def_ref += reg_def + df_corr;
 
             double drift_accum = drift_tmp * (tof_tmp / 25.0);
             double jump_h = 0.3;
+
+        if(use_fm1_reverse_ref)
+        {
+            drift_accum = 0.0;
+            jump_h = 0.0;
+        }
 
             def_ref += drift_accum;
             def_ref += jump_h;
@@ -1695,12 +1797,9 @@ auto finishTgtBaseShot = [&]() -> std::string
 {
     prepareTgtBaseShotForObserverCorrections();
 
-    std::string result = renderFire(false);
+    current_menu = "FM1_BASE_PIECE";
 
-    last_solution = result;
-    current_menu = "COMP_CORR";
-
-    return result + "COMP CORR (Y N P *)\nTESON EVIL";
+    return "BASE PIECE (P *): " + std::to_string(base_piece_index + 1);
 };
 
 //////////////////////////////////////////////////
@@ -2620,6 +2719,10 @@ if(current_menu=="MAP_MODEL")
 
         if(cmd=="2")
         {
+            fm1_base_def_reverse = false;
+            active_fm1_def_reverse = false;
+            active_fm1_transport_qe_shape = false;
+
             current_menu="REG";
 
             if(reg_data_available)
@@ -2662,7 +2765,8 @@ if(current_menu=="MAP_MODEL")
                 <<" E "<<guns[i].e<<"\n";
             }
             out << "BASE PIECE " << (base_piece_index + 1) << "\n";
-
+            out << "AZ LAY " << az_lay << "\n";
+            out << "REF DEF " << def_base << "\n";
             // TARGET
             out<<"TGT ALT "<<tgt_alt
             <<" N "<<tgt_n
@@ -2870,21 +2974,6 @@ if(current_menu=="FM1_GRID")
             if(!v.empty())
                 fm1_temp_alt = std::stod(v);
 
-            // =====================================================
-            // TGT 1 = CUADRÍCULA
-            // =====================================================
-            //
-            // Aquí el blanco se define por coordenadas reales.
-            // NO se aplica lógica del observador al crear el TGT.
-            //
-            // La lógica del observador aplica DESPUÉS, cuando el
-            // operador entra por:
-            //
-            //   COMP CORR -> N
-            //
-            // y empieza a ingresar nueva DIR + L/R A/D U/D.
-            // =====================================================
-
             targets[fm1_temp_knpt] = {fm1_temp_e, fm1_temp_n, fm1_temp_alt};
 
             current_knpt = fm1_temp_knpt;
@@ -2927,7 +3016,29 @@ if(current_menu=="FM1_GRID")
                 return msg.str();
             }
 
-            return finishTgtBaseShot();
+            fm1_grid_reg_dist_backup = reg_dist;
+            fm1_grid_reg_def_backup = reg_def;
+            fm1_grid_df_corr_backup = df_corr;
+            fm1_grid_time_reg_correction_backup = time_reg_correction;
+            fm1_grid_ud_active_backup = ud_active;
+            fm1_grid_ud_corr_backup = ud_corr;
+
+            reg_dist = 0.0;
+            reg_def = 0.0;
+            df_corr = 0.0;
+            time_reg_correction = 0.0;
+            ud_active = false;
+            ud_corr = 0.0;
+
+            fm1_grid_clean_fire_pending = true;
+
+            active_fm1_transport_qe_shape = false;
+            fm1_base_def_reverse = true;
+            active_fm1_def_reverse = true;
+
+            std::string result = finishTgtBaseShot();
+
+            return result;
         }
     }
 
@@ -3006,25 +3117,6 @@ if(current_menu=="FM1_TRANSPORT")
             if(!v.empty())
                 fm1_tr_ud_val = std::stod(v);
 
-            // =====================================================
-            // TGT 2 = TRANSPORTE
-            // =====================================================
-            //
-            // El transporte se calcula desde un KNPT existente.
-            // Este cálculo crea el nuevo blanco activo.
-            //
-            // IMPORTANTE:
-            // Aquí NO aplicamos todavía la lógica del observador.
-            // El transporte sigue siendo transporte.
-            //
-            // La lógica del observador aplica DESPUÉS del disparo base,
-            // cuando el operador entra por:
-            //
-            //   COMP CORR -> N
-            //
-            // y mete nueva DIR + L/R A/D U/D.
-            // =====================================================
-
             auto base = targets[fm1_from_knpt];
 
             double az_rad = fm1_tr_az * (PI / 3200.0);
@@ -3057,12 +3149,10 @@ if(current_menu=="FM1_TRANSPORT")
             tgt_n = new_n;
             tgt_alt = new_alt;
 
-            // El blanco transportado queda como target activo.
-            current_knpt = fm1_from_knpt;
-
-            // Mantiene el comportamiento actual: el KNPT usado en DESDE
-            // queda actualizado al target transportado.
-            targets[current_knpt] = {tgt_e, tgt_n, tgt_alt};
+            // TGT2 es un blanco transportado temporal.
+            // NO sobrescribe el KNPT de origen.
+            // Así FM2 puede seguir usando el TGT original.
+            current_knpt = 0;
 
             last_inputs.push_back("FM1 TRANSPORT");
             last_inputs.push_back("DESDE " + std::to_string(fm1_from_knpt));
@@ -3110,8 +3200,14 @@ if(current_menu=="FM1_TRANSPORT")
 
                 return msg.str();
             }
+            
+            fm1_base_def_reverse = true;
+            active_fm1_def_reverse = true;
+            active_fm1_transport_qe_shape = true;
 
-            return finishTgtBaseShot();
+            std::string result = finishTgtBaseShot();
+
+            return result;
         }
     }
 
@@ -3166,32 +3262,6 @@ if(current_menu=="FM1_POLAR")
             if(!v.empty())
                 fm1_pol_ud_val = std::stod(v);
 
-            // =====================================================
-            // TGT 3 = POLAR
-            // =====================================================
-            //
-            // El blanco polar se calcula desde la GB usando:
-            //
-            //   AZ
-            //   DIST
-            //   S/B + valor vertical
-            //
-            // Igual que TGT 1 y TGT 2, este menú crea un blanco base
-            // y luego hace un disparo base.
-            //
-            // IMPORTANTE:
-            // Aquí NO aplicamos todavía la lógica del observador.
-            // La lógica del observador aplica DESPUÉS del disparo base,
-            // cuando el operador entra por:
-            //
-            //   COMP CORR -> N
-            //
-            // y mete nueva DIR + L/R A/D U/D.
-            //
-            // Por eso este cierre debe usar finishTgtBaseShot(), igual
-            // que TGT 1 y TGT 2.
-            // =====================================================
-
             double az_rad = fm1_pol_az * (PI / 3200.0);
 
             double dx = fm1_pol_dist * std::sin(az_rad);
@@ -3212,9 +3282,6 @@ if(current_menu=="FM1_POLAR")
             tgt_n = new_n;
             tgt_alt = new_alt;
 
-            // Si ya hay un KNPT activo, actualizamos ese.
-            // Si no hay ninguno todavía, usamos 1 como respaldo para
-            // evitar guardar en KNPT 0.
             if(current_knpt <= 0)
                 current_knpt = 1;
 
@@ -3896,21 +3963,8 @@ if(current_menu=="SHIFT")
                 last_inputs.push_back("FUZE PDA");
             }
 
-            // 🔥 SIEMPRE recalcular solución base
-            try
-            {
-                renderFire(false);
-            }
-            catch(...)
-            {
-                return "ERROR: NO SOLUTION";
-            }
-
-            input_stage++;
-
-            std::stringstream ss;
-            ss << "REG RG (" << (int)last_dist_solution << "):";
-            return ss.str();
+            current_menu = "REG_BASE_PIECE";
+            return "BASE PIECE (P *): " + std::to_string(base_piece_index + 1);
         }
 
         case 6:
@@ -4105,6 +4159,153 @@ if(current_menu=="SHIFT")
 }
 
 //////////////////////////////////////////////////
+// REG - CONFIRMAR BASE PIECE DESPUES DE FUZE
+//////////////////////////////////////////////////
+
+if(current_menu=="REG_BASE_PIECE")
+{
+    if(cmd=="P")
+    {
+        current_menu = "REG";
+        input_stage = 5;
+        return "FUZE:";
+    }
+
+    std::string v = normStr(cmd);
+
+    int bp = base_piece_index + 1;
+
+    if(!v.empty())
+    {
+        try
+        {
+            bp = std::stoi(v);
+        }
+        catch(...)
+        {
+            return "BASE PIECE (P *): " + std::to_string(base_piece_index + 1);
+        }
+    }
+
+    if(bp <= 0)
+    {
+        return "INVALID BASE\nBASE PIECE (P *): " + std::to_string(base_piece_index + 1);
+    }
+
+    if(bp > (int)guns.size())
+    {
+        return "BASE > QTY\nBASE PIECE (P *): " + std::to_string(base_piece_index + 1);
+    }
+
+    base_piece_index = bp - 1;
+
+    // Recalcular solucion base usando la nueva BASE PIECE.
+    // Esto actualiza last_dist_solution, last_def_solution y last_qe_solution.
+    try
+    {
+        renderFire(false);
+    }
+    catch(...)
+    {
+        current_menu = "REG";
+        input_stage = 5;
+        return "ERROR: NO SOLUTION";
+    }
+
+    current_menu = "REG";
+    input_stage = 6;
+
+    std::stringstream ss;
+    ss << "REG RG (" << (int)last_dist_solution << "):";
+    return ss.str();
+}
+
+//////////////////////////////////////////////////
+// FM1 - CONFIRMAR BASE PIECE ANTES DEL DISPARO
+//////////////////////////////////////////////////
+
+if(current_menu=="FM1_BASE_PIECE")
+{
+    if(cmd=="P")
+    {
+        current_menu = "FM";
+        return drPrefix("FM", fireMenu());
+    }
+
+    std::string v = normStr(cmd);
+
+    int bp = base_piece_index + 1;
+
+    if(!v.empty())
+    {
+        try
+        {
+            bp = std::stoi(v);
+        }
+        catch(...)
+        {
+            return "BASE PIECE (P *): " + std::to_string(base_piece_index + 1);
+        }
+    }
+
+    if(bp <= 0)
+    {
+        return "INVALID BASE\nBASE PIECE (P *): " + std::to_string(base_piece_index + 1);
+    }
+
+    if(bp > (int)guns.size())
+    {
+        return "BASE > QTY\nBASE PIECE (P *): " + std::to_string(base_piece_index + 1);
+    }
+
+    base_piece_index = bp - 1;
+
+    std::string result = renderFire(false);
+
+    if(fm1_grid_clean_fire_pending)
+    {
+        reg_dist = fm1_grid_reg_dist_backup;
+        reg_def = fm1_grid_reg_def_backup;
+        df_corr = fm1_grid_df_corr_backup;
+        time_reg_correction = fm1_grid_time_reg_correction_backup;
+        ud_active = fm1_grid_ud_active_backup;
+        ud_corr = fm1_grid_ud_corr_backup;
+
+        fm1_grid_clean_fire_pending = false;
+    }
+
+    ShotLog shot;
+    shot.label = "BASE FIRE";
+    shot.fire = result;
+    shot.timestamp = getCurrentTime();
+
+    std::stringstream input_ss;
+
+    for(const auto& s : last_inputs)
+        input_ss << s << "\n";
+
+    shot.inputs = input_ss.str();
+
+    last_inputs.clear();
+
+    mission_log.push_back(shot);
+
+    last_solution = result;
+    current_menu = "COMP_CORR";
+    chg_allowed = true;
+
+    // IMPORTANTE:
+    // TGT1 usa DEF reverse solo para el disparo base.
+    // Despues del resultado, debe apagarse para que COMP CORR -> N,
+    // INST_UD_SHIFT, FM3 y demas correcciones no hereden esa logica.
+    fm1_base_def_reverse = false;
+    active_fm1_def_reverse = false;
+    active_fm1_transport_qe_shape = false;
+
+    return result + "COMP CORR (Y N P *)\nTESON EVIL";
+}
+
+//////////////////////////////////////////////////
 // COMP CORR
 //////////////////////////////////////////////////
 
@@ -4130,6 +4331,16 @@ if(current_menu=="COMP_CORR")
     // N = ESP. INSTANTANEA / CORRECCIONES PDA
 if(cmd=="N")
 {
+    if(time_reg_fuze_temporary)
+    {
+        fuze_time_mode = false;
+        hob = 0;
+        time_reg_fuze_temporary = false;
+    }
+
+    ud_active = false;
+    ud_corr = 0.0;
+
     // Limpiar datos previos de la corrección instantánea
     inst_prev_dir = 0.0;
     inst_prev_lr = 0.0;
@@ -4637,15 +4848,24 @@ if(current_menu=="INST_UD_SHIFT")
     {
         if(cmd=="PDA")
         {
+            // PDA normal para este TIME REG.
+            // No queda ningun modo temporal activo.
             fuze_time_mode = false;
             hob = 0;
+            time_reg_fuze_temporary = false;
+
             current_menu = "UD_CORR";
-            return renderFire(false) + "(U/D) CORR (*)";
+            return "(U/D) CORR (*)";
         }
 
         if(cmd=="TIA")
         {
+            // TIA temporal solo para TIME REG y su U/D CORR.
+            // Despues de aplicar U/D CORR se restablece a PDA.
             fuze_time_mode = true;
+            hob = 0;
+            time_reg_fuze_temporary = true;
+
             current_menu = "TIME_REG_HOB";
             return "TOTAL HOB (*):";
         }
@@ -4657,8 +4877,14 @@ if(current_menu=="INST_UD_SHIFT")
     {
         hob = std::stod(cmd);
         last_inputs.push_back("HOB " + cmd);
+
+        // Mantener TIA activo solamente para el resultado final
+        // despues de aplicar U/D CORR.
+        fuze_time_mode = true;
+        time_reg_fuze_temporary = true;
+
         current_menu = "UD_CORR";
-        return renderFire(false) + "(U/D) CORR (*)";
+        return "(U/D) CORR (*)";
     }
 
 //////////////////////////////////////////////////
@@ -4669,22 +4895,50 @@ if(current_menu=="INST_UD_SHIFT")
     {
         if(cmd=="X")
         {
-            current_menu="FM";
-            return drPrefix("FM",fireMenu());
+            if(time_reg_fuze_temporary)
+            {
+                fuze_time_mode = false;
+                hob = 0;
+                time_reg_fuze_temporary = false;
+            }
+
+            ud_active = false;
+            ud_corr = 0.0;
+
+            current_menu = "FM";
+            return drPrefix("FM", fireMenu());
         }
 
         double corr = 0.0;
-        if(!parseUD(cmd,corr))
+
+        if(!parseUD(cmd, corr))
             return "(U/D) CORR (*)";
+
 
         ud_corr = corr;
         ud_active = true;
+
         last_inputs.push_back(cmd);
 
         std::string result = renderFire(false);
         last_solution = result;
 
-        return result + "(U/D) CORR (*)";
+
+
+        ud_active = false;
+        ud_corr = 0.0;
+
+        if(time_reg_fuze_temporary)
+        {
+            fuze_time_mode = false;
+            hob = 0;
+            time_reg_fuze_temporary = false;
+        }
+
+        current_menu = "COMP_CORR";
+        chg_allowed = true;
+
+        return result + "COMP CORR (Y N P *)\nTESON EVIL";
     }
 
 //////////////////////////////////////////////////
@@ -4880,6 +5134,7 @@ std::string BasicEngine::resetData()
 
     fuze_time_mode=false;
     hob=0;
+    time_reg_fuze_temporary = false;
     ud_corr=0;
     ud_active=false;
 
@@ -4901,7 +5156,18 @@ std::string BasicEngine::resetData()
     fm1_temp_knpt = 0;
     fm1_temp_e = 0.0;
     fm1_temp_n = 0.0;
-    fm1_temp_alt = 0.0;    
+    fm1_temp_alt = 0.0;
+    fm1_base_def_reverse = false;
+    active_fm1_def_reverse = false;
+    active_fm1_transport_qe_shape = false;
+
+    fm1_grid_clean_fire_pending = false;
+    fm1_grid_reg_dist_backup = 0.0;
+    fm1_grid_reg_def_backup = 0.0;
+    fm1_grid_df_corr_backup = 0.0;
+    fm1_grid_time_reg_correction_backup = 0.0;
+    fm1_grid_ud_active_backup = false;
+    fm1_grid_ud_corr_backup = 0.0;
 
     fm1_from_knpt = 0;
 
@@ -4949,8 +5215,13 @@ std::string BasicEngine::resetData()
     }
 
     // intento 3 (ruta absoluta desde exe)
+    // Windows usa GetModuleFileNameA.
+    // Linux/WSL usa /proc/self/exe.
     if(!loaded)
     {
+        std::string fullPath = "";
+
+#ifdef _WIN32
         char buffer[MAX_PATH];
         GetModuleFileNameA(NULL, buffer, MAX_PATH);
 
@@ -4958,17 +5229,33 @@ std::string BasicEngine::resetData()
         size_t pos = exePath.find_last_of("\\/");
 
         std::string dir = exePath.substr(0, pos);
+        fullPath = dir + "\\tables.csv";
+#else
+        char buffer[4096];
+        ssize_t len = readlink("/proc/self/exe", buffer, sizeof(buffer) - 1);
 
-        std::string fullPath = dir + "\\tables.csv";
-
-        std::ifstream f3(fullPath);
-        if(f3.good())
+        if(len > 0)
         {
-            loadTablesFromCSV(fullPath);
-            loaded = true;
+            buffer[len] = '\0';
+
+            std::string exePath(buffer);
+            size_t pos = exePath.find_last_of("/");
+
+            std::string dir = exePath.substr(0, pos);
+            fullPath = dir + "/tables.csv";
+        }
+#endif
+
+        if(!fullPath.empty())
+        {
+            std::ifstream f3(fullPath);
+            if(f3.good())
+            {
+                loadTablesFromCSV(fullPath);
+                loaded = true;
+            }
         }
     }
-
     if(!loaded)
     {
         std::cout << "ERROR: tables.csv no encontrado\n";

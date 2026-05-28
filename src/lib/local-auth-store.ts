@@ -113,6 +113,11 @@ export async function findLocalUserByUsername(username: string) {
   return readUsersUnsafe().find((user) => user.username.toLowerCase() === username.toLowerCase()) ?? null;
 }
 
+export async function listLocalUserProfiles() {
+  await ensureLocalUsers();
+  return readUsersUnsafe().map(({ password, ...user }) => user);
+}
+
 export async function createLocalUser(input: {
   username: string;
   password: string;
