@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { Globe, Search } from "lucide-react";
+import { Globe, Navigation, Search } from "lucide-react";
+import { Button } from "@/components/ui/button";
 import dynamic from "next/dynamic";
 const TacticalMap = dynamic(
   () => import("@/components/TacticalMapMapcn").then((mod) => mod.TacticalMapMapcn),
@@ -62,6 +63,7 @@ interface SimulatorTabProps {
   coordinateInputs: Record<CoordinateRole, CoordinateInput>;
   onCoordinateInputChange: (role: CoordinateRole, field: keyof CoordinateInput, value: string) => void;
   onPlaceCoordinate: (role: CoordinateRole) => void;
+  onClearCoordinate: (role: CoordinateRole) => void;
   mapModelInput?: {
     maxE: number;
     minE: number;
@@ -106,6 +108,7 @@ export function SimulatorTab({
   coordinateInputs,
   onCoordinateInputChange,
   onPlaceCoordinate,
+  onClearCoordinate,
   mapModelInput,
 }: SimulatorTabProps) {
   const [otLine, setOtLine] = useState(0);
@@ -163,9 +166,32 @@ export function SimulatorTab({
 
   return (
     <div className="h-full w-full min-h-0 flex flex-col">
-      <div className="flex-1 min-h-0 grid grid-cols-[18rem_1fr_18rem] gap-3 p-3">
+      <div className="flex-1 min-h-0 relative overflow-hidden p-3">
+        <div className="absolute inset-0 z-0">
+          <TacticalMap
+            gunPosition={gunPosition}
+            targetPosition={targetPosition}
+            observerPosition={observerPosition}
+            mapCenter={mapCenter} 
+            impacts={impacts}
+            onSetTarget={handleSetTarget}
+            onSetGun={handleSetGun}
+            onLocateGun={() => handleSetGun(mapCenter)}
+            onCenterChange={setMapCenter}
+            realLatLng={realLatLng}
+            isFiring={isFiring}
+            showExplosion={showExplosion}
+            fireProgress={fireProgress}
+            isGunLocated={isGunLocated}
+            mapModelBounds={mapModelBounds}
+          />
+        </div>
+        <div className="absolute inset-y-0 left-0 z-10 w-[24rem] pointer-events-none bg-gradient-to-r from-[#0A0A0B]/95 via-[#0A0A0B]/70 to-transparent" />
+        <div className="absolute inset-y-0 right-0 z-10 w-[24rem] pointer-events-none bg-gradient-to-l from-[#0A0A0B]/95 via-[#0A0A0B]/70 to-transparent" />
+
+        <div className="relative z-20 h-full min-h-0 grid grid-cols-[18rem_1fr_18rem] gap-3 pointer-events-none">
         {/* Panel Izquierdo: Localización */}
-        <div className="h-full min-h-0 flex flex-col gap-3">
+        <div className="h-full min-h-0 flex flex-col gap-3 pointer-events-auto">
           <div className="bg-[#0A0A0B] p-5 rounded-[20px] border-2 border-[#F39C63] shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2 text-[#F39C63]">
@@ -217,10 +243,8 @@ export function SimulatorTab({
           </div>
         </div>
 
-        {/* Centro: Mapa + Buscador Flotante */}
-        <div className="h-full min-h-0 flex flex-col gap-3">
-          <div className="flex-1 min-h-0 rounded-xl overflow-hidden border border-border bg-background relative">
-            
+        {/* Centro: Buscador Flotante */}
+        <div className="h-full min-h-0 relative pointer-events-none">
             <div className="absolute top-4 right-16 z-[400] flex items-center gap-2 pointer-events-auto">
               <div className="relative group">
                 <Search className="absolute left-3.5 top-1/2 -translate-y-1/2 w-4 h-4 text-[#F39C63] opacity-70 group-focus-within:opacity-100 transition-opacity z-10" />
@@ -233,33 +257,26 @@ export function SimulatorTab({
                   className="w-64 h-11 pl-10 bg-[#0A0A0B]/80 backdrop-blur-xl border-2 border-[#7c4a3a] focus:border-[#F39C63] text-white font-black text-[10px] tracking-widest rounded-xl transition-all duration-300 outline-none placeholder:text-white/20 shadow-2xl"
                 />
               </div>
+              <Button
+                size="icon"
+                variant="secondary"
+                className="h-11 w-11 shadow-2xl backdrop-blur-xl border bg-black/60 border-[#F39C63]/40 text-[#F39C63]"
+                onClick={() => {
+                  navigator.geolocation.getCurrentPosition((pos) => {
+                    setMapCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+                  });
+                }}
+              >
+                <Navigation className="w-5 h-5" />
+              </Button>
             </div>
-
-            <TacticalMap
-              gunPosition={gunPosition}
-              targetPosition={targetPosition}
-              observerPosition={observerPosition}
-              mapCenter={mapCenter} 
-              impacts={impacts}
-              onSetTarget={handleSetTarget}
-              onSetGun={handleSetGun}
-              onLocateGun={() => handleSetGun(mapCenter)}
-              onCenterChange={setMapCenter}
-              realLatLng={realLatLng}
-              isFiring={isFiring}
-              showExplosion={showExplosion}
-              fireProgress={fireProgress}
-              isGunLocated={isGunLocated}
-              mapModelBounds={mapModelBounds}
-            />
-          </div>
-
         </div>
 
         {/* Panel Derecho */}
-        <div className="h-full min-h-0 flex flex-col gap-3">
+        <div className="h-full min-h-0 flex flex-col gap-3 pointer-events-auto">
           <MeteorologyPanel position={gunPosition || mapCenter} />
           <AdvancedObserver otLine={otLine} setOtLine={setOtLine} onCorrection={(lr, ad) => handleAOCorrection(otLine, lr, ad)} />
+        </div>
         </div>
       </div>
 
@@ -275,6 +292,7 @@ export function SimulatorTab({
           coordinateInputs={coordinateInputs}
           onCoordinateInputChange={onCoordinateInputChange}
           onPlaceCoordinate={onPlaceCoordinate}
+          onClearCoordinate={onClearCoordinate}
           mapModelInput={mapModelInput}
           isFiring={isFiring} isGeneratingReport={false} numPieces={numPieces} beamType={beamType}
         />

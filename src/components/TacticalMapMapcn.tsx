@@ -27,6 +27,7 @@ interface TacticalMapProps {
   fireProgress?: number;
   isGunLocated?: boolean;
   mapModelBounds?: [LatLng, LatLng] | null;
+  enableClickPlacement?: boolean;
 }
 
 /**
@@ -74,6 +75,7 @@ export function TacticalMapMapcn({
   isFiring,
   fireProgress = 0,
   mapModelBounds,
+  enableClickPlacement = false,
 }: TacticalMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
@@ -114,10 +116,14 @@ export function TacticalMapMapcn({
       });
     });
 
-    map.current.on('click', (e) => onSetGun({ lat: e.lngLat.lat, lng: e.lngLat.lng }));
+    if (enableClickPlacement) {
+      map.current.on('click', (e) => onSetGun({ lat: e.lngLat.lat, lng: e.lngLat.lng }));
+    }
     map.current.on('contextmenu', (e) => {
       e.preventDefault();
-      onSetTarget({ lat: e.lngLat.lat, lng: e.lngLat.lng });
+      if (enableClickPlacement) {
+        onSetTarget({ lat: e.lngLat.lat, lng: e.lngLat.lng });
+      }
     });
 
     return () => { map.current?.remove(); map.current = null; };
@@ -255,7 +261,6 @@ export function TacticalMapMapcn({
           onClick={() => {
             navigator.geolocation.getCurrentPosition((pos) => {
               const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-              onSetGun(coords);
               if (onCenterChange) onCenterChange(coords);
             });
           }}

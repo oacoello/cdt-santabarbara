@@ -371,6 +371,18 @@ export default function HP71Emulator({
       const nextPieceField = getPiecePromptField(responseText);
       setPieceField(nextPieceField);
 
+      if (pendingPieceField === "alt") {
+        const draft = pieceDraftRef.current;
+        if (draft.e && draft.n && draft.alt) {
+          onPieceComplete?.({
+            e: Number(draft.e),
+            n: Number(draft.n),
+            alt: Number(draft.alt),
+          });
+          pieceDraftRef.current = {};
+        }
+      }
+
       if (/COB\s+STORED/i.test(responseText)) {
         const draft = pieceDraftRef.current;
         if (draft.e && draft.n && draft.alt) {
