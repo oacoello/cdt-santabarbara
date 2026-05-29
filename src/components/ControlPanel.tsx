@@ -20,6 +20,14 @@ import { type LatLng, type WeaponSystem, computeFiringSolution, WEAPON_DATA } fr
 import { cn } from '@/lib/utils';
 import { utmToLatLon } from '@/lib/coordinates';
 
+export type CoordinateRole = 'piece' | 'target' | 'observer';
+
+export type CoordinateInput = {
+  e: string;
+  n: string;
+  alt: string;
+};
+
 interface ControlPanelProps {
   gunPosition: LatLng | null;
   targetPosition: LatLng | null;
@@ -36,6 +44,25 @@ interface ControlPanelProps {
   onSetTarget?: () => void;
   onUpdatePosition?: (mode: 'PIEZA' | 'OBJETIVO', coord: LatLng) => void;
   onDrawMapModel?: (bounds: [LatLng, LatLng]) => void;
+  onMapModelInputApply?: (model: {
+    maxE: number;
+    minE: number;
+    maxN: number;
+    minN: number;
+    gz: number;
+    spher: string;
+  }) => void;
+  coordinateInputs: Record<CoordinateRole, CoordinateInput>;
+  onCoordinateInputChange: (role: CoordinateRole, field: keyof CoordinateInput, value: string) => void;
+  onPlaceCoordinate: (role: CoordinateRole) => void;
+  mapModelInput?: {
+    maxE: number;
+    minE: number;
+    maxN: number;
+    minN: number;
+    gz: number;
+    spher: string;
+  } | null;
   isFiring: boolean;
   isGeneratingReport: boolean;
   numPieces: number;
@@ -58,6 +85,11 @@ export function ControlPanel({
   onSetTarget,
   onUpdatePosition,
   onDrawMapModel,
+  onMapModelInputApply,
+  coordinateInputs,
+  onCoordinateInputChange,
+  onPlaceCoordinate,
+  mapModelInput,
   isFiring,
   isGeneratingReport,
   numPieces,
@@ -72,6 +104,16 @@ export function ControlPanel({
   const [zona, setZona] = useState('16');
   const [esferoide, setEsferoide] = useState('1');
 
+  useEffect(() => {
+    if (!mapModelInput) return;
+    setMaxE(String(Math.trunc(mapModelInput.maxE)));
+    setMinE(String(Math.trunc(mapModelInput.minE)));
+    setMaxN(String(Math.trunc(mapModelInput.maxN)));
+    setMinN(String(Math.trunc(mapModelInput.minN)));
+    setZona(String(Math.trunc(mapModelInput.gz)));
+    setEsferoide(mapModelInput.spher);
+  }, [mapModelInput]);
+
   const handleDrawMapModel = () => {
     if (!onDrawMapModel) return;
 
@@ -85,6 +127,14 @@ export function ControlPanel({
         { lat: pointMax.latitude, lng: pointMax.longitude }  // NE
       ];
 
+      onMapModelInputApply?.({
+        maxE: Number(maxE),
+        minE: Number(minE),
+        maxN: Number(maxN),
+        minN: Number(minN),
+        gz: Number(zona),
+        spher: esferoide,
+      });
       onDrawMapModel(bounds);
     } catch (error) {
       console.error('Error converting UTM:', error);
@@ -376,53 +426,34 @@ export function ControlPanel({
 
             <Separator orientation="vertical" className="hidden lg:block h-32 my-auto bg-border" />
 
-            {/* ─── Ajuste y Ubicación ─── */}
-            <div className="flex-none flex flex-col gap-3 min-w-[220px]">
+            {/* ─── Ajustes Manuales ─── */}
+            <div className="flex-[1.35] flex flex-col gap-3 min-w-[520px]">
               <div className="flex items-center gap-2">
                 <div className="w-1 h-3 bg-primary rounded-full" />
                 <h2 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">Ajustes</h2>
               </div>
-              <div className="flex flex-col items-center gap-3">
-                <div className="grid grid-cols-3 gap-2 bg-background p-2 rounded-2xl border border-border">
-                  <div />
-                  <AdjBtn icon={<ChevronUp />} onClick={() => handleFineAdjustment('up')} title="ALARGAR" />
-                  <div />
-                  <AdjBtn icon={<ChevronLeft />} onClick={() => handleFineAdjustment('left')} title="IZQUIERDA" />
-                  <div className="flex items-center justify-center p-2"><Crosshair className="w-5 h-5 text-muted-foreground/40" /></div>
-                  <AdjBtn icon={<ChevronRight />} onClick={() => handleFineAdjustment('right')} title="DERECHA" />
-                  <div />
-                  <AdjBtn icon={<ChevronDown />} onClick={() => handleFineAdjustment('down')} title="ACORTAR" />
-                  <div />
-                </div>
-
-                <div className="flex gap-2 w-full">
-                  <Button
-                    size="sm"
-                    variant={activeEditMode === 'PIEZA' ? 'default' : 'outline'}
-                    onClick={() => { setActiveEditMode('PIEZA'); onSetGun?.(); }}
-                    className={cn(
-                      "flex-1 h-10 text-[11px] font-black uppercase rounded-xl transition-colors gap-2",
-                      activeEditMode === 'PIEZA'
-                        ? "bg-[#F39C63] text-black border-[#F39C63]"
-                        : "bg-background border-border hover:bg-secondary"
-                    )}
-                  >
-                    <MapPin className="w-3.5 h-3.5" /> Set Pieza
-                  </Button>
-                  <Button
-                    size="sm"
-                    variant={activeEditMode === 'OBJETIVO' ? 'default' : 'outline'}
-                    onClick={() => { setActiveEditMode('OBJETIVO'); onSetTarget?.(); }}
-                    className={cn(
-                      "flex-1 h-10 text-[11px] font-black uppercase rounded-xl transition-colors gap-2",
-                      activeEditMode === 'OBJETIVO'
-                        ? "bg-[#F39C63] text-black border-[#F39C63]"
-                        : "bg-background border-border hover:bg-secondary"
-                    )}
-                  >
-                    <Target className="w-3.5 h-3.5" /> Set Objetivo
-                  </Button>
-                </div>
+              <div className="space-y-3">
+                <CoordinatePlacementRow
+                  label="Pieza"
+                  buttonLabel="Colocar pieza"
+                  value={coordinateInputs.piece}
+                  onChange={(field, value) => onCoordinateInputChange('piece', field, value)}
+                  onPlace={() => onPlaceCoordinate('piece')}
+                />
+                <CoordinatePlacementRow
+                  label="Objetivo"
+                  buttonLabel="Colocar objetivo"
+                  value={coordinateInputs.target}
+                  onChange={(field, value) => onCoordinateInputChange('target', field, value)}
+                  onPlace={() => onPlaceCoordinate('target')}
+                />
+                <CoordinatePlacementRow
+                  label="Observador"
+                  buttonLabel="Colocar observador"
+                  value={coordinateInputs.observer}
+                  onChange={(field, value) => onCoordinateInputChange('observer', field, value)}
+                  onPlace={() => onPlaceCoordinate('observer')}
+                />
               </div>
             </div>
 
@@ -533,6 +564,60 @@ function FiringRow({
         <span className="ml-1 text-[11px] font-bold text-muted-foreground/80">{unit}</span>
       </span>
     </div>
+  );
+}
+
+function CoordinatePlacementRow({
+  label,
+  buttonLabel,
+  value,
+  onChange,
+  onPlace,
+}: {
+  label: string;
+  buttonLabel: string;
+  value: CoordinateInput;
+  onChange: (field: keyof CoordinateInput, value: string) => void;
+  onPlace: () => void;
+}) {
+  return (
+    <div className="grid grid-cols-[84px_repeat(3,minmax(100px,1fr))_128px] items-end gap-3 border-b border-border/70 pb-3 last:border-b-0 last:pb-0">
+      <div className="pb-3 text-[11px] font-black uppercase tracking-wider text-foreground">
+        {label}
+      </div>
+      <CoordinateField label="Este" value={value.e} onChange={(next) => onChange('e', next)} />
+      <CoordinateField label="Norte" value={value.n} onChange={(next) => onChange('n', next)} />
+      <CoordinateField label="Altura" value={value.alt} onChange={(next) => onChange('alt', next)} />
+      <Button
+        onClick={onPlace}
+        className="h-9 rounded-xl bg-[#F39C63] text-[#0A0A0B] hover:bg-[#F39C63]/90 text-[11px] leading-none font-black uppercase tracking-wide"
+      >
+        {buttonLabel}
+      </Button>
+    </div>
+  );
+}
+
+function CoordinateField({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (value: string) => void;
+}) {
+  return (
+    <label className="space-y-1">
+      <span className="text-[10px] uppercase font-bold text-[#F39C63] ml-1 tracking-wider">{label}</span>
+      <input
+        type="text"
+        inputMode="numeric"
+        value={value}
+        onChange={(e) => onChange(e.target.value)}
+        className="w-full bg-background border border-border h-9 text-sm font-mono font-black rounded-xl hover:bg-secondary transition-colors px-3 text-[#F39C63]"
+      />
+    </label>
   );
 }
 

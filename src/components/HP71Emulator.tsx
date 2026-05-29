@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 
 // ---------- Funciones auxiliares ----------
 function extractBasePiece(text: string): number | null {
@@ -186,10 +186,90 @@ async function fetchHp71Display(command: string): Promise<string> {
 type HP71EmulatorProps = {
   userName?: string;
   logSessionId?: string;
+  onMapModelComplete?: (model: {
+    maxE: number;
+    minE: number;
+    maxN: number;
+    minN: number;
+    gz: number;
+    spher: string;
+  }) => void;
+  onObserverComplete?: (observer: {
+    alt: number;
+    e: number;
+    n: number;
+  }) => void;
+  onPieceComplete?: (piece: {
+    alt: number;
+    e: number;
+    n: number;
+  }) => void;
+  onTargetComplete?: (target: {
+    alt: number;
+    e: number;
+    n: number;
+  }) => void;
+  isActive?: boolean;
 };
 
+type MapModelField = "maxE" | "minE" | "maxN" | "minN" | "gz" | "spher";
+type ObserverField = "alt" | "e" | "n";
+type PieceField = "e" | "n" | "alt";
+type TargetField = "e" | "n" | "alt";
+
+const MAP_MODEL_PROMPTS: Array<[MapModelField, RegExp]> = [
+  ["maxE", /MAX\s+E\s+\(P\s+\*\)/i],
+  ["minE", /MIN\s+E\s+\(P\s+\*\)/i],
+  ["maxN", /MAX\s+N\s+\(P\s+\*\)/i],
+  ["minN", /MIN\s+N\s+\(P\s+\*\)/i],
+  ["gz", /GZ\s+\(P\s+\*\)/i],
+  ["spher", /SPHER\s+\(P\s+\*\)/i],
+];
+
+function getMapModelPromptField(text: string): MapModelField | null {
+  return MAP_MODEL_PROMPTS.find(([, pattern]) => pattern.test(text))?.[0] ?? null;
+}
+
+const OBSERVER_PROMPTS: Array<[ObserverField, RegExp]> = [
+  ["alt", /OBS\s+ALT(?:\s+\(P\s+\*\))?:/i],
+  ["e", /OBS\s+E\s+\(P\s+\*\)/i],
+  ["n", /OBS\s+N\s+\(P\s+\*\)/i],
+];
+
+function getObserverPromptField(text: string): ObserverField | null {
+  return OBSERVER_PROMPTS.find(([, pattern]) => pattern.test(text))?.[0] ?? null;
+}
+
+const PIECE_PROMPTS: Array<[PieceField, RegExp]> = [
+  ["e", /GB\s+E\s+\(P\s+\*\)/i],
+  ["n", /GB\s+N\s+\(P\s+\*\)/i],
+  ["alt", /GB\s+ALT\s+\(P\s+\*\)/i],
+];
+
+function getPiecePromptField(text: string): PieceField | null {
+  return PIECE_PROMPTS.find(([, pattern]) => pattern.test(text))?.[0] ?? null;
+}
+
+const TARGET_PROMPTS: Array<[TargetField, RegExp]> = [
+  ["e", /TGT\s+E\s+\(P\s+\*\)/i],
+  ["n", /TGT\s+N\s+\(P\s+\*\)/i],
+  ["alt", /TGT\s+ALT\s+\(P\s+\*\)/i],
+];
+
+function getTargetPromptField(text: string): TargetField | null {
+  return TARGET_PROMPTS.find(([, pattern]) => pattern.test(text))?.[0] ?? null;
+}
+
 // ---------- Componente principal ----------
-export default function HP71Emulator({ userName = "sin-perfil", logSessionId = "session" }: HP71EmulatorProps) {
+export default function HP71Emulator({
+  userName = "sin-perfil",
+  logSessionId = "session",
+  onMapModelComplete,
+  onObserverComplete,
+  onPieceComplete,
+  onTargetComplete,
+  isActive = true,
+}: HP71EmulatorProps) {
   const [screenText, setScreenText] = useState("SANTA BARBARA");
   const [buffer, setBuffer] = useState("");
   const [loading, setLoading] = useState(false);
@@ -206,6 +286,14 @@ export default function HP71Emulator({ userName = "sin-perfil", logSessionId = "
   // Nuevos estados para pieza base
   const [basePieceNumber, setBasePieceNumber] = useState<number>(1);
   const [waitingBasePiece, setWaitingBasePiece] = useState<boolean>(false);
+  const [mapModelField, setMapModelField] = useState<MapModelField | null>(null);
+  const mapModelDraftRef = useRef<Partial<Record<MapModelField, string>>>({});
+  const [observerField, setObserverField] = useState<ObserverField | null>(null);
+  const observerDraftRef = useRef<Partial<Record<ObserverField, string>>>({});
+  const [pieceField, setPieceField] = useState<PieceField | null>(null);
+  const pieceDraftRef = useRef<Partial<Record<PieceField, string>>>({});
+  const [targetField, setTargetField] = useState<TargetField | null>(null);
+  const targetDraftRef = useRef<Partial<Record<TargetField, string>>>({});
 
   // ---------- Arranque original: SANTA BARBARA durante 2 segundos ----------
   useEffect(() => {
@@ -232,10 +320,112 @@ export default function HP71Emulator({ userName = "sin-perfil", logSessionId = "
   // ---------- Envío de comandos al servidor ----------
   const sendCommand = useCallback(async (command: string, preferredBasePieceNumber = basePieceNumber) => {
     if (!command.trim() || loading) return;
+    const pendingMapModelField = command !== "P" ? mapModelField : null;
+    const pendingObserverField = command !== "P" ? observerField : null;
+    const pendingPieceField = command !== "P" ? pieceField : null;
+    const pendingTargetField = command !== "P" ? targetField : null;
     setLoading(true);
     try {
       const responseText = await fetchHp71Display(command);
       let nextBasePieceNumber = preferredBasePieceNumber;
+
+      if (pendingMapModelField) {
+        mapModelDraftRef.current = {
+          ...mapModelDraftRef.current,
+          [pendingMapModelField]: command.trim(),
+        };
+      }
+
+      const nextMapModelField = getMapModelPromptField(responseText);
+      setMapModelField(nextMapModelField);
+
+      if (pendingObserverField) {
+        observerDraftRef.current = {
+          ...observerDraftRef.current,
+          [pendingObserverField]: command.trim(),
+        };
+      }
+
+      const nextObserverField = getObserverPromptField(responseText);
+      setObserverField(nextObserverField);
+
+      if (/OBS\s+STORED/i.test(responseText)) {
+        const draft = observerDraftRef.current;
+        if (draft.alt && draft.e && draft.n) {
+          onObserverComplete?.({
+            alt: Number(draft.alt),
+            e: Number(draft.e),
+            n: Number(draft.n),
+          });
+        }
+        observerDraftRef.current = {};
+      }
+
+      if (pendingPieceField) {
+        pieceDraftRef.current = {
+          ...pieceDraftRef.current,
+          [pendingPieceField]: command.trim(),
+        };
+      }
+
+      const nextPieceField = getPiecePromptField(responseText);
+      setPieceField(nextPieceField);
+
+      if (/COB\s+STORED/i.test(responseText)) {
+        const draft = pieceDraftRef.current;
+        if (draft.e && draft.n && draft.alt) {
+          onPieceComplete?.({
+            e: Number(draft.e),
+            n: Number(draft.n),
+            alt: Number(draft.alt),
+          });
+        }
+        pieceDraftRef.current = {};
+      }
+
+      if (pendingTargetField) {
+        targetDraftRef.current = {
+          ...targetDraftRef.current,
+          [pendingTargetField]: command.trim(),
+        };
+      }
+
+      const nextTargetField = getTargetPromptField(responseText);
+      setTargetField(nextTargetField);
+
+      if (/TGT\s+.+STORED/i.test(responseText)) {
+        const draft = targetDraftRef.current;
+        if (draft.e && draft.n && draft.alt) {
+          onTargetComplete?.({
+            e: Number(draft.e),
+            n: Number(draft.n),
+            alt: Number(draft.alt),
+          });
+        }
+        targetDraftRef.current = {};
+      }
+
+      if (/MAP\s+STORED/i.test(responseText)) {
+        const draft = mapModelDraftRef.current;
+        if (
+          draft.maxE &&
+          draft.minE &&
+          draft.maxN &&
+          draft.minN &&
+          draft.gz &&
+          draft.spher
+        ) {
+          onMapModelComplete?.({
+            maxE: Number(draft.maxE),
+            minE: Number(draft.minE),
+            maxN: Number(draft.maxN),
+            minN: Number(draft.minN),
+            gz: Number(draft.gz),
+            spher: draft.spher,
+          });
+        }
+        mapModelDraftRef.current = {};
+      }
 
       // Lógica nueva para pieza base
       const basePiece = extractBasePiece(responseText);
@@ -284,7 +474,7 @@ export default function HP71Emulator({ userName = "sin-perfil", logSessionId = "
     } finally {
       setLoading(false);
     }
-  }, [basePieceNumber, loading]);
+  }, [basePieceNumber, loading, mapModelField, observerField, pieceField, targetField, onMapModelComplete, onObserverComplete, onPieceComplete, onTargetComplete]);
 
   // ---------- Manejo unificado de teclas ----------
   const handleKeyPress = useCallback(
@@ -344,6 +534,14 @@ export default function HP71Emulator({ userName = "sin-perfil", logSessionId = "
         setManualResults([]);
         setBasePieceNumber(1);
         setWaitingBasePiece(false);
+        setMapModelField(null);
+        mapModelDraftRef.current = {};
+        setObserverField(null);
+        observerDraftRef.current = {};
+        setPieceField(null);
+        pieceDraftRef.current = {};
+        setTargetField(null);
+        targetDraftRef.current = {};
         setTimeout(() => {
           setPromptVisible(true);
           setScreenText("> ");
@@ -374,7 +572,14 @@ export default function HP71Emulator({ userName = "sin-perfil", logSessionId = "
 
   // ---------- Teclado físico ----------
   useEffect(() => {
+    if (!isActive) return;
     const onKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (
+        target?.tagName === "INPUT" ||
+        target?.tagName === "TEXTAREA" ||
+        target?.isContentEditable
+      ) return;
       if (e.ctrlKey || e.altKey || e.metaKey) return;
       if (e.repeat) return; // evita repeticiones
       e.preventDefault();
@@ -391,7 +596,7 @@ export default function HP71Emulator({ userName = "sin-perfil", logSessionId = "
 
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [handleKeyPress]);
+  }, [handleKeyPress, isActive]);
 
   // ---------- Contenido del LCD ----------
   const lcdContent = pieceMode && pieces.length > 0
