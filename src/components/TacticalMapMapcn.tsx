@@ -14,6 +14,7 @@ const MAP_STYLE = `https://api.maptiler.com/maps/outdoor-v2-dark/style.json?key=
 interface TacticalMapProps {
   gunPosition: LatLng | null;
   targetPosition: LatLng | null;
+  observerPosition?: LatLng | null;
   mapCenter: LatLng;
   impacts: LatLng[];
   onSetTarget: (coord: LatLng) => void;
@@ -64,6 +65,7 @@ const get3DParabolicPath = (start: LatLng, end: LatLng, progress: number, segmen
 export function TacticalMapMapcn({
   gunPosition,
   targetPosition,
+  observerPosition,
   mapCenter,
   impacts,
   onSetTarget,
@@ -213,20 +215,34 @@ export function TacticalMapMapcn({
     };
 
     updateMarker('gun', gunPosition, `
-      <div class="w-8 h-8 bg-blue-500/20 border-2 border-blue-500 rounded-full flex items-center justify-center backdrop-blur-sm shadow-[0_0_15px_rgba(59,130,246,0.5)]">
+      <div class="relative flex flex-col items-center">
+        <div class="mb-1 whitespace-nowrap rounded bg-black/75 px-2 py-0.5 text-[10px] font-black tracking-widest text-blue-300 border border-blue-400/50">Pieza</div>
+        <div class="w-8 h-8 bg-blue-500/20 border-2 border-blue-500 rounded-full flex items-center justify-center backdrop-blur-sm shadow-[0_0_15px_rgba(59,130,246,0.5)]">
         <div class="w-2 h-2 bg-blue-500 rounded-full"></div>
+        </div>
+      </div>`);
+
+    updateMarker('observer', observerPosition ?? null, `
+      <div class="relative flex flex-col items-center">
+        <div class="mb-1 whitespace-nowrap rounded bg-black/75 px-2 py-0.5 text-[10px] font-black tracking-widest text-white border border-white/60">Obs</div>
+        <div class="w-8 h-8 bg-white/20 border-2 border-white rounded-full flex items-center justify-center backdrop-blur-sm shadow-[0_0_15px_rgba(255,255,255,0.55)]">
+          <div class="w-2 h-2 bg-white rounded-full"></div>
+        </div>
       </div>`);
 
     updateMarker('target', targetPosition, `
-      <div class="w-8 h-8 bg-[#F39C63]/20 border-2 border-[#F39C63] rounded-sm rotate-45 flex items-center justify-center backdrop-blur-sm shadow-[0_0_15px_rgba(243,156,99,0.5)]">
-        <div class="w-2 h-2 bg-[#F39C63] rounded-full"></div>
+      <div class="relative flex flex-col items-center">
+        <div class="mb-1 whitespace-nowrap rounded bg-black/75 px-2 py-0.5 text-[10px] font-black tracking-widest text-[#F39C63] border border-[#F39C63]/50">Obj</div>
+        <div class="w-8 h-8 bg-[#F39C63]/20 border-2 border-[#F39C63] rounded-sm rotate-45 flex items-center justify-center backdrop-blur-sm shadow-[0_0_15px_rgba(243,156,99,0.5)]">
+          <div class="w-2 h-2 bg-[#F39C63] rounded-full"></div>
+        </div>
       </div>`);
 
     Object.keys(markersRef.current).forEach(k => { if (k.startsWith('impact-')) markersRef.current[k].remove(); });
     impacts.forEach((imp, i) => {
       updateMarker(`impact-${i}`, imp, `<div class="w-4 h-4 bg-red-600/60 border border-red-400 rounded-full animate-ping"></div>`);
     });
-  }, [gunPosition, targetPosition, impacts]);
+  }, [gunPosition, targetPosition, observerPosition, impacts]);
 
   return (
     <div className="relative w-full h-full rounded-2xl overflow-hidden border-2 border-[#F39C63] shadow-2xl">

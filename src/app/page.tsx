@@ -20,11 +20,28 @@ import { computeFiringSolution, getMuzzleVelocity, simulateTrajectory } from '@/
 import HP71Emulator from '@/components/HP71Emulator';
 import { HP71ReportsTab } from '@/components/HP71ReportsTab';
 import { ProfileManager } from '@/components/ProfileManager';
+import { utmToLatLon } from '@/lib/coordinates';
+import type { CoordinateInput, CoordinateRole } from '@/components/ControlPanel';
 
 const TacticalMap = dynamic(
   () => import("@/components/TacticalMapMapcn").then((mod) => mod.TacticalMapMapcn),
   { ssr: false }
 );
+
+const EMPTY_COORDINATES: Record<CoordinateRole, CoordinateInput> = {
+  piece: { e: '', n: '', alt: '' },
+  target: { e: '', n: '', alt: '' },
+  observer: { e: '', n: '', alt: '' },
+};
+
+const DEFAULT_MAP_MODEL_UTM = {
+  maxE: 473000,
+  minE: 447000,
+  maxN: 1584000,
+  minN: 1567000,
+  gz: 16,
+  spher: '1',
+};
 
 export default function SantaBarbaraFDC() {
   const { toast } = useToast();
@@ -67,6 +84,16 @@ export default function SantaBarbaraFDC() {
 
   const [mapCenter, setMapCenter] = useState<LatLng>({ lat: 14.0818, lng: -87.2068 });
   const [mapModelBounds, setMapModelBounds] = useState<[LatLng, LatLng] | null>(null);
+  const [mapModelUtm, setMapModelUtm] = useState<{
+    maxE: number;
+    minE: number;
+    maxN: number;
+    minN: number;
+    gz: number;
+    spher: string;
+  } | null>(DEFAULT_MAP_MODEL_UTM);
+  const [observerPosition, setObserverPosition] = useState<LatLng | null>(null);
+  const [coordinateInputs, setCoordinateInputs] = useState<Record<CoordinateRole, CoordinateInput>>(EMPTY_COORDINATES);
   const [isGunLocated, setIsGunLocated] = useState(false);
   const [isFiring, setIsFiring] = useState(false);
   const [fireProgress, setFireProgress] = useState(0);
@@ -161,6 +188,116 @@ export default function SantaBarbaraFDC() {
     setMapCenter({ lat: centerLat, lng: centerLng });
   };
 
+  const handleHp71MapModelComplete = (model: {
+    maxE: number;
+    minE: number;
+    maxN: number;
+    minN: number;
+    gz: number;
+    spher: string;
+  }) => {
+    try {
+      setMapModelUtm(model);
+      const pointMax = utmToLatLon(model.maxE, model.maxN, model.gz, model.spher);
+      const pointMin = utmToLatLon(model.minE, model.minN, model.gz, model.spher);
+
+      handleDrawMapModel([
+        { lat: pointMin.latitude, lng: pointMin.longitude },
+        { lat: pointMax.latitude, lng: pointMax.longitude },
+      ]);
+    } catch (error) {
+      console.error('Error drawing HP71 map model:', error);
+    }
+  };
+
+  const expandUtmPart = (value: number, reference: number) => {
+    const raw = String(Math.trunc(value));
+    const ref = String(Math.trunc(reference));
+
+    if (raw.length >= ref.length) return value;
+    return Number(`${ref.slice(0, ref.length - raw.length)}${raw}`);
+  };
+
+  const setCoordinateInput = (role: CoordinateRole, next: CoordinateInput) => {
+    setCoordinateInputs((prev) => ({ ...prev, [role]: next }));
+  };
+
+  const handleCoordinateInputChange = (
+    role: CoordinateRole,
+    field: keyof CoordinateInput,
+    value: string,
+  ) => {
+    setCoordinateInputs((prev) => ({
+      ...prev,
+      [role]: { ...prev[role], [field]: value },
+    }));
+  };
+
+  const placeCoordinate = (role: CoordinateRole, coordinates = coordinateInputs[role]) => {
+    if (!mapModelUtm) {
+      toast({
+        variant: "destructive",
+        title: "MAPA MODELO NO DEFINIDO",
+        description: "Dibujá o cargá el mapa modelo antes de colocar coordenadas.",
+      });
+      return;
+    }
+
+    const rawE = Number(coordinates.e);
+    const rawN = Number(coordinates.n);
+    if (!Number.isFinite(rawE) || !Number.isFinite(rawN)) return;
+
+    const easting = expandUtmPart(rawE, mapModelUtm.minE);
+    const northing = expandUtmPart(rawN, mapModelUtm.minN);
+    const point = utmToLatLon(easting, northing, mapModelUtm.gz, mapModelUtm.spher);
+    const position = { lat: point.latitude, lng: point.longitude };
+
+    setCoordinateInput(role, {
+      e: String(Math.trunc(easting)),
+      n: String(Math.trunc(northing)),
+      alt: coordinates.alt,
+    });
+
+    if (role === 'piece') {
+      setGunPosition(position);
+      setIsGunLocated(true);
+      setLastTrajectory(null);
+    } else if (role === 'target') {
+      setTargetPosition(position);
+      setLastTrajectory(null);
+    } else {
+      setObserverPosition(position);
+    }
+  };
+
+  const handleHp71ObserverComplete = (observer: { alt: number; e: number; n: number }) => {
+    try {
+      placeCoordinate('observer', {
+        e: String(observer.e),
+        n: String(observer.n),
+        alt: String(observer.alt),
+      });
+    } catch (error) {
+      console.error('Error drawing HP71 observer:', error);
+    }
+  };
+
+  const handleHp71PieceComplete = (piece: { alt: number; e: number; n: number }) => {
+    placeCoordinate('piece', {
+      e: String(piece.e),
+      n: String(piece.n),
+      alt: String(piece.alt),
+    });
+  };
+
+  const handleHp71TargetComplete = (target: { alt: number; e: number; n: number }) => {
+    placeCoordinate('target', {
+      e: String(target.e),
+      n: String(target.n),
+      alt: String(target.alt),
+    });
+  };
+
   // Lógica de Autenticación
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -252,7 +389,12 @@ export default function SantaBarbaraFDC() {
               // NUEVA PROP: Pasamos la trayectoria guardada
               lastTrajectory={lastTrajectory}
               corrections={[]} handleAdjust={() => {}} handleFire={handleFire} handleGenerateReport={handleGenerateReport}
-              realLatLng={null} handleAOCorrection={() => {}} onDrawMapModel={handleDrawMapModel} mapModelBounds={mapModelBounds}
+              realLatLng={null} handleAOCorrection={() => {}} onDrawMapModel={handleDrawMapModel} onMapModelInputApply={setMapModelUtm} mapModelBounds={mapModelBounds}
+              observerPosition={observerPosition}
+              coordinateInputs={coordinateInputs}
+              onCoordinateInputChange={handleCoordinateInputChange}
+              onPlaceCoordinate={placeCoordinate}
+              mapModelInput={mapModelUtm}
             />
           </TabsContent>
 
@@ -260,13 +402,22 @@ export default function SantaBarbaraFDC() {
           <TabsContent value="manual" forceMount className="h-full w-full m-0 border-none bg-transparent data-[state=inactive]:hidden p-4">
             <div className="grid h-full min-h-0 grid-cols-1 xl:grid-cols-[minmax(0,1.15fr)_minmax(420px,0.85fr)] gap-4">
               <div className="min-h-0 flex items-center justify-center overflow-auto">
-                <HP71Emulator userName={loggedUser?.name ?? undefined} logSessionId={logSessionId} />
+                <HP71Emulator
+                  userName={loggedUser?.name ?? undefined}
+                  logSessionId={logSessionId}
+                  onMapModelComplete={handleHp71MapModelComplete}
+                  onObserverComplete={handleHp71ObserverComplete}
+                  onPieceComplete={handleHp71PieceComplete}
+                  onTargetComplete={handleHp71TargetComplete}
+                  isActive={activeTab === "manual"}
+                />
               </div>
 
               <div className="min-h-[320px] xl:min-h-0 rounded-xl overflow-hidden border border-border bg-background relative">
                 <TacticalMap
                   gunPosition={gunPosition}
                   targetPosition={targetPosition}
+                  observerPosition={observerPosition}
                   mapCenter={mapCenter}
                   impacts={[]}
                   onSetTarget={(coord) => { setTargetPosition(coord); setLastTrajectory(null); }}

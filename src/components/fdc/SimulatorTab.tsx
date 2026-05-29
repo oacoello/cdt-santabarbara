@@ -8,6 +8,7 @@ const TacticalMap = dynamic(
   { ssr: false }
 );
 import { ControlPanel } from "@/components/ControlPanel";
+import type { CoordinateInput, CoordinateRole } from "@/components/ControlPanel";
 import {
   type LatLng,
   type WeaponSystem,
@@ -22,6 +23,7 @@ import { cn } from "@/lib/utils";
 interface SimulatorTabProps {
   gunPosition: LatLng | null;
   targetPosition: LatLng | null;
+  observerPosition?: LatLng | null;
   mapCenter: LatLng;
   setMapCenter: (coord: LatLng) => void;
   isGunLocated: boolean;
@@ -48,12 +50,32 @@ interface SimulatorTabProps {
   realLatLng: LatLng | null;
   handleAOCorrection: (otLine: number, lr: number, ad: number) => void;
   onDrawMapModel?: (bounds: [LatLng, LatLng]) => void;
+  onMapModelInputApply?: (model: {
+    maxE: number;
+    minE: number;
+    maxN: number;
+    minN: number;
+    gz: number;
+    spher: string;
+  }) => void;
   mapModelBounds?: [LatLng, LatLng] | null;
+  coordinateInputs: Record<CoordinateRole, CoordinateInput>;
+  onCoordinateInputChange: (role: CoordinateRole, field: keyof CoordinateInput, value: string) => void;
+  onPlaceCoordinate: (role: CoordinateRole) => void;
+  mapModelInput?: {
+    maxE: number;
+    minE: number;
+    maxN: number;
+    minN: number;
+    gz: number;
+    spher: string;
+  } | null;
 }
 
 export function SimulatorTab({
   gunPosition,
   targetPosition,
+  observerPosition,
   mapCenter,
   setMapCenter,
   isGunLocated,
@@ -79,7 +101,12 @@ export function SimulatorTab({
   setBeamType,
   handleAOCorrection,
   onDrawMapModel,
+  onMapModelInputApply,
   mapModelBounds,
+  coordinateInputs,
+  onCoordinateInputChange,
+  onPlaceCoordinate,
+  mapModelInput,
 }: SimulatorTabProps) {
   const [otLine, setOtLine] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
@@ -211,6 +238,7 @@ export function SimulatorTab({
             <TacticalMap
               gunPosition={gunPosition}
               targetPosition={targetPosition}
+              observerPosition={observerPosition}
               mapCenter={mapCenter} 
               impacts={impacts}
               onSetTarget={handleSetTarget}
@@ -243,6 +271,11 @@ export function SimulatorTab({
           onSetGun={() => handleSetGun(mapCenter)} onSetTarget={() => handleSetTarget(mapCenter)}
           onUpdatePosition={handleUpdatePosition || internalHandleUpdatePosition}
           onDrawMapModel={onDrawMapModel}
+          onMapModelInputApply={onMapModelInputApply}
+          coordinateInputs={coordinateInputs}
+          onCoordinateInputChange={onCoordinateInputChange}
+          onPlaceCoordinate={onPlaceCoordinate}
+          mapModelInput={mapModelInput}
           isFiring={isFiring} isGeneratingReport={false} numPieces={numPieces} beamType={beamType}
         />
       </div>
