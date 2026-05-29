@@ -36,3 +36,46 @@ export function utmToLatLon(easting: number, northing: number, zoneNum: number, 
     longitude: lon0 + lo * (180 / Math.PI)
   };
 }
+
+export function latLonToUtm(latitude: number, longitude: number, zoneNum?: number) {
+  const a = 6378137;
+  const f = 1 / 298.257223563;
+  const k0 = 0.9996;
+  const e = Math.sqrt(f * (2 - f));
+  const ePrimeSq = (e * e) / (1 - e * e);
+
+  const zone = zoneNum ?? Math.floor((longitude + 180) / 6) + 1;
+  const lonOrigin = (zone - 1) * 6 - 180 + 3;
+  const latRad = latitude * Math.PI / 180;
+  const lonRad = longitude * Math.PI / 180;
+  const lonOriginRad = lonOrigin * Math.PI / 180;
+
+  const n = a / Math.sqrt(1 - e * e * Math.sin(latRad) * Math.sin(latRad));
+  const t = Math.tan(latRad) * Math.tan(latRad);
+  const c = ePrimeSq * Math.cos(latRad) * Math.cos(latRad);
+  const aa = Math.cos(latRad) * (lonRad - lonOriginRad);
+
+  const m = a * (
+    (1 - e * e / 4 - 3 * Math.pow(e, 4) / 64 - 5 * Math.pow(e, 6) / 256) * latRad
+    - (3 * e * e / 8 + 3 * Math.pow(e, 4) / 32 + 45 * Math.pow(e, 6) / 1024) * Math.sin(2 * latRad)
+    + (15 * Math.pow(e, 4) / 256 + 45 * Math.pow(e, 6) / 1024) * Math.sin(4 * latRad)
+    - (35 * Math.pow(e, 6) / 3072) * Math.sin(6 * latRad)
+  );
+
+  const easting = k0 * n * (
+    aa + (1 - t + c) * Math.pow(aa, 3) / 6
+    + (5 - 18 * t + t * t + 72 * c - 58 * ePrimeSq) * Math.pow(aa, 5) / 120
+  ) + 500000;
+
+  let northing = k0 * (
+    m + n * Math.tan(latRad) * (
+      aa * aa / 2
+      + (5 - t + 9 * c + 4 * c * c) * Math.pow(aa, 4) / 24
+      + (61 - 58 * t + t * t + 600 * c - 330 * ePrimeSq) * Math.pow(aa, 6) / 720
+    )
+  );
+
+  if (latitude < 0) northing += 10000000;
+
+  return { easting, northing, zoneNum: zone, hemisphere: latitude >= 0 ? 'N' : 'S' };
+}

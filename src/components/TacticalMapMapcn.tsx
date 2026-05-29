@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import { Navigation } from 'lucide-react';
 import { type LatLng } from '@/lib/ballistics';
+import { latLonToUtm, utmToLatLon } from '@/lib/coordinates';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import maplibregl from 'maplibre-gl';
@@ -10,6 +11,77 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 
 const MAPTILER_KEY = 'VRmMIQ93urJL9gK2BcI1'; 
 const MAP_STYLE = `https://api.maptiler.com/maps/outdoor-v2-dark/style.json?key=${MAPTILER_KEY}`;
+
+const UTM_GRID_ZONE = 16;
+
+const getGridStepMeters = (zoom: number) => {
+  if (zoom >= 15) return 1000;
+  if (zoom >= 13) return 2000;
+  if (zoom >= 11) return 5000;
+  return 10000;
+};
+
+const buildUtmGridData = (bounds: maplibregl.LngLatBounds, zoom: number) => {
+  const step = getGridStepMeters(zoom);
+  const sw = bounds.getSouthWest();
+  const ne = bounds.getNorthEast();
+  const nw = bounds.getNorthWest();
+  const se = bounds.getSouthEast();
+  const corners = [sw, ne, nw, se].map((corner) => latLonToUtm(corner.lat, corner.lng, UTM_GRID_ZONE));
+
+  const minE = Math.floor(Math.min(...corners.map((c) => c.easting)) / step) * step;
+  const maxE = Math.ceil(Math.max(...corners.map((c) => c.easting)) / step) * step;
+  const minN = Math.floor(Math.min(...corners.map((c) => c.northing)) / step) * step;
+  const maxN = Math.ceil(Math.max(...corners.map((c) => c.northing)) / step) * step;
+  const sampleStep = Math.max(250, step / 4);
+
+  const lineFeatures: GeoJSON.Feature<GeoJSON.LineString>[] = [];
+  const labelFeatures: GeoJSON.Feature<GeoJSON.Point>[] = [];
+
+  for (let easting = minE; easting <= maxE; easting += step) {
+    const coordinates: [number, number][] = [];
+    for (let northing = minN; northing <= maxN; northing += sampleStep) {
+      const point = utmToLatLon(easting, northing, UTM_GRID_ZONE, 'P');
+      coordinates.push([point.longitude, point.latitude]);
+    }
+    lineFeatures.push({
+      type: 'Feature',
+      geometry: { type: 'LineString', coordinates },
+      properties: { kind: 'easting', label: `E ${Math.round(easting)}` },
+    });
+    const labelPoint = utmToLatLon(easting, minN + step * 0.35, UTM_GRID_ZONE, 'P');
+    labelFeatures.push({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [labelPoint.longitude, labelPoint.latitude] },
+      properties: { label: `E ${Math.round(easting)}` },
+    });
+  }
+
+  for (let northing = minN; northing <= maxN; northing += step) {
+    const coordinates: [number, number][] = [];
+    for (let easting = minE; easting <= maxE; easting += sampleStep) {
+      const point = utmToLatLon(easting, northing, UTM_GRID_ZONE, 'P');
+      coordinates.push([point.longitude, point.latitude]);
+    }
+    lineFeatures.push({
+      type: 'Feature',
+      geometry: { type: 'LineString', coordinates },
+      properties: { kind: 'northing', label: `N ${Math.round(northing)}` },
+    });
+    const labelPoint = utmToLatLon(minE + step * 0.35, northing, UTM_GRID_ZONE, 'P');
+    labelFeatures.push({
+      type: 'Feature',
+      geometry: { type: 'Point', coordinates: [labelPoint.longitude, labelPoint.latitude] },
+      properties: { label: `N ${Math.round(northing)}` },
+    });
+  }
+
+  return {
+    lines: { type: 'FeatureCollection', features: lineFeatures } as GeoJSON.FeatureCollection<GeoJSON.LineString>,
+    labels: { type: 'FeatureCollection', features: labelFeatures } as GeoJSON.FeatureCollection<GeoJSON.Point>,
+  };
+};
+
 
 interface TacticalMapProps {
   gunPosition: LatLng | null;
@@ -114,6 +186,60 @@ export function TacticalMapMapcn({
           'line-opacity': 0.9
         }
       });
+
+      map.current.addSource('utm-grid-lines', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] }
+      });
+
+      map.current.addLayer({
+        id: 'utm-grid-lines',
+        type: 'line',
+        source: 'utm-grid-lines',
+        paint: {
+          'line-color': '#85C5F1',
+          'line-width': 1,
+          'line-opacity': 0.45
+        }
+      });
+
+      map.current.addSource('utm-grid-labels', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] }
+      });
+
+      map.current.addLayer({
+        id: 'utm-grid-labels',
+        type: 'symbol',
+        source: 'utm-grid-labels',
+        layout: {
+          'text-field': ['get', 'label'],
+          'text-size': 11,
+          'text-anchor': 'center',
+          'text-allow-overlap': false
+        },
+        paint: {
+          'text-color': '#85C5F1',
+          'text-halo-color': '#0A0A0E',
+          'text-halo-width': 2,
+          'text-opacity': 0.95
+        }
+      });
+
+      const updateUtmGrid = () => {
+        if (!map.current) return;
+        const lines = map.current.getSource('utm-grid-lines') as maplibregl.GeoJSONSource | undefined;
+        const labels = map.current.getSource('utm-grid-labels') as maplibregl.GeoJSONSource | undefined;
+        if (!lines || !labels) return;
+        const grid = buildUtmGridData(map.current.getBounds(), map.current.getZoom());
+        lines.setData(grid.lines);
+        labels.setData(grid.labels);
+      };
+
+      updateUtmGrid();
+      map.current.on('moveend', updateUtmGrid);
+      map.current.on('zoomend', updateUtmGrid);
+
     });
 
     if (enableClickPlacement) {
