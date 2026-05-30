@@ -14,14 +14,16 @@
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "dist": "npm run build:web && electron-builder --win --linux",
+    "dist": "npm run dist:current",
     "postinstall": "prisma generate",
-    "build:hp71:linux": "cmake -S HP71 -B HP71/build -DCMAKE_BUILD_TYPE=Release && cmake --build HP71/build --target hp71_emulator && mkdir -p HP71/dist/linux && cp HP71/build/hp71_server/hp71_emulator HP71/dist/linux/hp71_emulator && chmod +x HP71/dist/linux/hp71_emulator",
+    "build:hp71:linux": "cmake -S HP71 -B HP71/build -DCMAKE_BUILD_TYPE=Release && cmake --build HP71/build --target hp71_emulator --config Release && node scripts/prepare-hp71-binary.js linux",
     "build:web": "prisma generate && next build && node scripts/prepare-electron-assets.js",
-    "dist:win": "npm run build:web && electron-builder --win",
-    "dist:linux": "npm run build:web && electron-builder --linux",
+    "dist:win": "npm run build:web && node scripts/check-electron-package-assets.js win && electron-builder --win",
+    "dist:linux": "npm run build:web && node scripts/check-electron-package-assets.js linux && electron-builder --linux",
     "db:push": "prisma db push",
-    "db:seed": "prisma db seed"
+    "db:seed": "prisma db seed",
+    "dist:current": "npm run build:web && node scripts/check-electron-package-assets.js current && electron-builder",
+    "build:hp71:win": "cmake -S HP71 -B HP71/build -DCMAKE_BUILD_TYPE=Release && cmake --build HP71/build --target hp71_emulator --config Release && node scripts/prepare-hp71-binary.js win"
   },
   "prisma": {
     "seed": "ts-node --compiler-options {\"module\":\"CommonJS\"} prisma/seed.ts"
