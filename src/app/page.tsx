@@ -261,12 +261,28 @@ export default function SantaBarbaraFDC() {
     if (role === 'piece') {
       setGunPosition(position);
       setIsGunLocated(true);
+      setMapCenter(position);
       setLastTrajectory(null);
     } else if (role === 'target') {
       setTargetPosition(position);
       setLastTrajectory(null);
     } else {
       setObserverPosition(position);
+    }
+  };
+
+  const clearCoordinate = (role: CoordinateRole) => {
+    setCoordinateInput(role, { e: '', n: '', alt: '' });
+
+    if (role === 'piece') {
+      setGunPosition(null);
+      setIsGunLocated(false);
+      setLastTrajectory(null);
+    } else if (role === 'target') {
+      setTargetPosition(null);
+      setLastTrajectory(null);
+    } else {
+      setObserverPosition(null);
     }
   };
 
@@ -394,6 +410,7 @@ export default function SantaBarbaraFDC() {
               coordinateInputs={coordinateInputs}
               onCoordinateInputChange={handleCoordinateInputChange}
               onPlaceCoordinate={placeCoordinate}
+              onClearCoordinate={clearCoordinate}
               mapModelInput={mapModelUtm}
             />
           </TabsContent>

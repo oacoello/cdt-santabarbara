@@ -11,7 +11,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Falta el parámetro key' }, { status: 400 });
     }
 
-    const backendRes = await fetch('http://127.0.0.1:8080/key', {
+    const backendUrl = process.env.HP71_BACKEND_URL ?? 'http://127.0.0.1:8080';
+    const backendRes = await fetch(`${backendUrl}/key`, {
       method: 'POST',
       headers: { 'Content-Type': 'text/plain' },
       body: key,

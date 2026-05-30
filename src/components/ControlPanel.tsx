@@ -3,7 +3,7 @@
 import React, { useState, useRef, useCallback, useEffect } from 'react';
 import {
   ChevronUp, ChevronDown, ChevronLeft, ChevronRight,
-  Flame, FileText, RefreshCw, Crosshair, Settings2, Zap, AlertTriangle, MapPin, Target,
+  Flame, RefreshCw, Crosshair, Settings2, AlertTriangle, MapPin, Target,
   Pin, PinOff, Maximize2, Minimize2, GripHorizontal
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -55,6 +55,7 @@ interface ControlPanelProps {
   coordinateInputs: Record<CoordinateRole, CoordinateInput>;
   onCoordinateInputChange: (role: CoordinateRole, field: keyof CoordinateInput, value: string) => void;
   onPlaceCoordinate: (role: CoordinateRole) => void;
+  onClearCoordinate: (role: CoordinateRole) => void;
   mapModelInput?: {
     maxE: number;
     minE: number;
@@ -89,6 +90,7 @@ export function ControlPanel({
   coordinateInputs,
   onCoordinateInputChange,
   onPlaceCoordinate,
+  onClearCoordinate,
   mapModelInput,
   isFiring,
   isGeneratingReport,
@@ -248,38 +250,22 @@ export function ControlPanel({
       )}
     >
       <Card className={cn(
-        "bg-background overflow-hidden",
+        "bg-transparent border-none shadow-none overflow-visible",
         isDragged ? "pointer-events-auto" : "pointer-events-auto"
       )}>
 
-        <div className="px-3 py-2 border-b border-border">
-          <div className="flex items-center justify-between gap-4">
-            <div className="flex items-center gap-3">
-              <div className="w-1.5 h-1.5 rounded-full bg-primary" />
-              <span className="text-xs font-black uppercase tracking-widest text-foreground/80">
-                Unidad de Control Táctico
-              </span>
-            </div>
-            <div className="text-right">
-              <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground">Estado del sistema</div>
-              <div className="text-[11px] font-mono text-green-500/80">LISTO // ÓPTIMO</div>
-            </div>
-          </div>
-        </div>
-
         <div className="p-3">
-          <div className="flex flex-col lg:flex-row gap-4">
+          <div className="flex flex-col lg:flex-row items-stretch gap-3">
 
             {/* ─── Configuración de Arma ─── */}
-            <div className="flex-none w-full lg:w-64 space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="w-1 h-3 bg-primary rounded-full" />
-                <h2 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">Arma</h2>
+            <div className="relative flex-none w-full lg:w-60 h-[18rem] rounded-[18px] border-2 border-[#F39C63] px-4 pb-4 pt-8 bg-[#0A0A0E]">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0A0A0E] px-5">
+                <h2 className="text-lg font-black uppercase tracking-wide text-foreground leading-none whitespace-nowrap">Arma</h2>
               </div>
-              <div className="space-y-3">
-                <div className="grid grid-cols-2 lg:grid-cols-1 gap-3">
+              <div className="space-y-2">
+                <div className="grid grid-cols-2 lg:grid-cols-1 gap-2">
                   <div className="space-y-1">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground ml-1 tracking-wider">Tipo de sistema</span>
+                    <span className="text-[10px] uppercase font-bold text-[#F39C63] ml-1 tracking-wider">Sistema</span>
                     <Select
                       value={weapon}
                       disabled={isFiring}
@@ -296,7 +282,7 @@ export function ControlPanel({
                   </div>
 
                   <div className="space-y-1">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground ml-1 tracking-wider">Carga propulsora</span>
+                    <span className="text-[10px] uppercase font-bold text-[#F39C63] ml-1 tracking-wider">Carga</span>
                     <Select
                       value={charge}
                       disabled={isFiring}
@@ -314,7 +300,7 @@ export function ControlPanel({
                   </div>
                 </div>
                 {sol && (
-                  <div className="text-[11px] font-mono text-muted-foreground bg-background p-2 rounded-lg border border-border">
+                  <div className="text-[11px] font-black uppercase text-[#C5D8D6] bg-background p-1 rounded-lg">
                     CARGA AUTOMÁTICA: {sol.recommendedCharge}
                   </div>
                 )}
@@ -322,20 +308,19 @@ export function ControlPanel({
             </div>
 
             {/* ─── Mapa Modelo ─── */}
-            <div className="flex-none w-full lg:w-64 space-y-3">
-              <div className="flex items-center gap-2">
-                <div className="w-1 h-3 bg-primary rounded-full" />
-                <h2 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">Mapa modelo</h2>
+            <div className="relative flex-none w-full lg:w-72 h-[18rem] rounded-[18px] border-2 border-[#F39C63] px-5 pb-4 pt-8 bg-[#0A0A0E]">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0A0A0E] px-5">
+                <h2 className="text-lg font-black uppercase tracking-wide text-foreground leading-none whitespace-nowrap">Mapa modelo</h2>
               </div>
               <div className="space-y-3">
-                <div className="grid grid-cols-2 gap-3">
+                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                   <div className="space-y-1">
                     <span className="text-[10px] uppercase font-bold text-muted-foreground ml-1 tracking-wider">MAX E</span>
                     <input
                       type="number"
                       value={maxE}
                       onChange={(e) => setMaxE(e.target.value)}
-                      className="w-full bg-background border border-border h-10 text-sm font-bold rounded-xl hover:bg-secondary transition-colors px-3"
+                      className="no-number-spinner w-full bg-background border border-border h-10 text-sm font-mono font-black rounded-xl hover:bg-secondary transition-colors px-3 text-[#F39C63]"
                     />
                   </div>
                   <div className="space-y-1">
@@ -344,7 +329,7 @@ export function ControlPanel({
                       type="number"
                       value={minE}
                       onChange={(e) => setMinE(e.target.value)}
-                      className="w-full bg-background border border-border h-10 text-sm font-bold rounded-xl hover:bg-secondary transition-colors px-3"
+                      className="no-number-spinner w-full bg-background border border-border h-10 text-sm font-mono font-black rounded-xl hover:bg-secondary transition-colors px-3 text-[#F39C63]"
                     />
                   </div>
                   <div className="space-y-1">
@@ -353,7 +338,7 @@ export function ControlPanel({
                       type="number"
                       value={maxN}
                       onChange={(e) => setMaxN(e.target.value)}
-                      className="w-full bg-background border border-border h-10 text-sm font-bold rounded-xl hover:bg-secondary transition-colors px-3"
+                      className="no-number-spinner w-full bg-background border border-border h-10 text-sm font-mono font-black rounded-xl hover:bg-secondary transition-colors px-3 text-[#F39C63]"
                     />
                   </div>
                   <div className="space-y-1">
@@ -362,50 +347,52 @@ export function ControlPanel({
                       type="number"
                       value={minN}
                       onChange={(e) => setMinN(e.target.value)}
-                      className="w-full bg-background border border-border h-10 text-sm font-bold rounded-xl hover:bg-secondary transition-colors px-3"
+                      className="no-number-spinner w-full bg-background border border-border h-10 text-sm font-mono font-black rounded-xl hover:bg-secondary transition-colors px-3 text-[#F39C63]"
                     />
                   </div>
+                </div>
+
+                <div className="grid grid-cols-[0.8fr_0.8fr_1.3fr] gap-3 items-end">
                   <div className="space-y-1">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground ml-1 tracking-wider">ZONA</span>
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground ml-1 tracking-wider">GZ</span>
                     <input
                       type="number"
                       value={zona}
                       onChange={(e) => setZona(e.target.value)}
-                      className="w-full bg-background border border-border h-10 text-sm font-bold rounded-xl hover:bg-secondary transition-colors px-3"
+                      className="no-number-spinner w-full bg-background border border-border h-10 text-sm font-mono font-black rounded-xl hover:bg-secondary transition-colors px-3 text-[#F39C63]"
                     />
                   </div>
                   <div className="space-y-1">
-                    <span className="text-[10px] uppercase font-bold text-muted-foreground ml-1 tracking-wider">ESFEROIDE</span>
+                    <span className="text-[10px] uppercase font-bold text-muted-foreground ml-1 tracking-wider">SPHR</span>
                     <input
                       type="number"
                       value={esferoide}
                       onChange={(e) => setEsferoide(e.target.value)}
-                      className="w-full bg-background border border-border h-10 text-sm font-bold rounded-xl hover:bg-secondary transition-colors px-3"
+                      className="no-number-spinner w-full bg-background border border-border h-10 text-sm font-mono font-black rounded-xl hover:bg-secondary transition-colors px-3 text-[#F39C63]"
                     />
                   </div>
+                  <Button
+                    onClick={handleDrawMapModel}
+                  className="h-12 bg-[#85C5F1] hover:bg-[#85C5F1]/90 text-[#0A0A0B] font-black uppercase tracking-wide rounded-xl leading-none shadow-[0_0_15px_rgba(133,197,241,0.3)] transition-all duration-300"
+                  >
+                    <span className="leading-none">Dibujar<br />Mapa</span>
+                  </Button>
                 </div>
-                <Button
-                  onClick={handleDrawMapModel}
-                  className="w-full bg-[#F39C63] hover:bg-[#F39C63]/90 text-[#0A0A0B] font-black uppercase tracking-widest h-10 shadow-[0_0_15px_rgba(243,156,99,0.3)] transition-all duration-300"
-                >
-                  Dibujar mapa modelo
-                </Button>
               </div>
             </div>
 
-            <Separator orientation="vertical" className="hidden lg:block h-32 my-auto bg-border" />
+            <Separator orientation="vertical" className="hidden h-32 my-auto bg-border" />
 
             {/* ─── Datos de Tiro ─── */}
-            <div className="flex-1 flex flex-col gap-3">
-              <div className="flex items-center gap-2">
-                <div className="w-1 h-3 bg-primary rounded-full" />
-                <h2 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">Datos de tiro</h2>
+            <div className="relative flex-none w-full lg:w-64 xl:w-72 h-[18rem] rounded-[18px] border-2 border-[#F39C63] px-4 pb-4 pt-8 bg-[#0A0A0E]">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0A0A0E] px-5">
+                <h2 className="text-lg font-black uppercase tracking-wide text-foreground leading-none whitespace-nowrap">Datos de tiro</h2>
               </div>
-              <div className="space-y-2">
-                <FiringRow label="Alcance" value={sol && typeof sol.range === 'number' ? sol.range.toFixed(0) : "0"} unit="m" />
-                <FiringRow label="Elevación" value={sol ? sol.elevMils.toString() : "0"} unit="MIL" valueClassName="text-primary" />
-                <FiringRow label="Azimut" value={sol ? Math.round(sol.azimuth).toString() : "0"} unit="MIL" valueClassName="text-yellow-500" />
-                <FiringRow label="Tiempo de vuelo" value={sol ? sol.timeOfFlight.toFixed(1) : "0"} unit="s" />
+              <div className="space-y-1">
+                <FiringMetric label="DIST." value={sol && typeof sol.range === 'number' ? sol.range.toFixed(0) : "0"} unit="m" className="text-[#85C5F1]" />
+                <FiringMetric label="QE." value={sol ? sol.elevMils.toString() : "0"} unit="mil" className="text-[#F29B62]" />
+                <FiringMetric label="AZ." value={sol ? Math.round(sol.azimuth).toString() : "0"} unit="mil" className="text-[#85C5F1]" />
+                <FiringMetric label="TOF." value={sol ? sol.timeOfFlight.toFixed(1) : "0"} unit="s" className="text-[#F29B62]" />
               </div>
 
               {corrections.length > 0 && (
@@ -424,21 +411,21 @@ export function ControlPanel({
               )}
             </div>
 
-            <Separator orientation="vertical" className="hidden lg:block h-32 my-auto bg-border" />
+            <Separator orientation="vertical" className="hidden h-32 my-auto bg-border" />
 
             {/* ─── Ajustes Manuales ─── */}
-            <div className="flex-[1.35] flex flex-col gap-3 min-w-[520px]">
-              <div className="flex items-center gap-2">
-                <div className="w-1 h-3 bg-primary rounded-full" />
-                <h2 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">Ajustes</h2>
+            <div className="relative flex-[1.35] min-w-[500px] h-[18rem] rounded-[18px] border-2 border-[#F39C63] px-5 pb-4 pt-8 bg-[#0A0A0E]">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0A0A0E] px-5">
+                <h2 className="text-lg font-black uppercase tracking-wide text-foreground leading-none whitespace-nowrap">Ajustes</h2>
               </div>
-              <div className="space-y-3">
+              <div className="space-y-2">
                 <CoordinatePlacementRow
                   label="Pieza"
                   buttonLabel="Colocar pieza"
                   value={coordinateInputs.piece}
                   onChange={(field, value) => onCoordinateInputChange('piece', field, value)}
                   onPlace={() => onPlaceCoordinate('piece')}
+                  onClear={() => onClearCoordinate('piece')}
                 />
                 <CoordinatePlacementRow
                   label="Objetivo"
@@ -446,6 +433,7 @@ export function ControlPanel({
                   value={coordinateInputs.target}
                   onChange={(field, value) => onCoordinateInputChange('target', field, value)}
                   onPlace={() => onPlaceCoordinate('target')}
+                  onClear={() => onClearCoordinate('target')}
                 />
                 <CoordinatePlacementRow
                   label="Observador"
@@ -453,58 +441,58 @@ export function ControlPanel({
                   value={coordinateInputs.observer}
                   onChange={(field, value) => onCoordinateInputChange('observer', field, value)}
                   onPlace={() => onPlaceCoordinate('observer')}
+                  onClear={() => onClearCoordinate('observer')}
                 />
               </div>
             </div>
 
-            <Separator orientation="vertical" className="hidden lg:block h-32 my-auto bg-border" />
+            <Separator orientation="vertical" className="hidden h-32 my-auto bg-border" />
 
             {/* ─── Acciones Finales ─── */}
-            <div className="flex-none flex flex-col gap-3 min-w-[200px]">
-              <div className="flex items-center gap-2">
-                <div className="w-1 h-3 bg-primary rounded-full" />
-                <h2 className="text-[11px] font-black uppercase tracking-widest text-muted-foreground">Acciones</h2>
+            <div className="relative flex-none min-w-[190px] h-[18rem] rounded-[18px] border-2 border-[#F39C63] px-4 pb-4 pt-8 bg-[#0A0A0E]">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0A0A0E] px-5">
+                <h2 className="text-lg font-black uppercase tracking-wide text-foreground leading-none whitespace-nowrap">Acciones</h2>
               </div>
-              <div className="flex flex-row lg:flex-col gap-3">
-                {numPieces > 1 && (
-                  <Button
-                    variant="ghost"
-                    size="sm"
-                    onClick={() => setShowBatteryDetails(!showBatteryDetails)}
-                    className={cn(
-                      "h-10 text-[11px] font-black uppercase gap-2 rounded-xl transition-colors border border-border",
-                      showBatteryDetails ? "text-primary bg-secondary" : "text-muted-foreground hover:text-foreground hover:bg-secondary"
-                    )}
-                  >
-                    {showBatteryDetails ? <Minimize2 className="w-3.5 h-3.5" /> : <Maximize2 className="w-3.5 h-3.5" />}
-                    {showBatteryDetails ? 'Ocultar datos de batería' : 'Ver datos de batería'}
-                  </Button>
-                )}
+              <div className="flex h-full flex-col items-center justify-around gap-3">
                 <Button
                   onClick={onFire}
                   disabled={!targetPosition || !isGunLocated || isFiring}
                   className={cn(
-                    "flex-1 font-black uppercase tracking-[0.2em] gap-3 h-16 shadow-2xl active:scale-95 transition-all text-xs rounded-2xl border-t border-white/20",
+                    "w-40 font-black uppercase tracking-wide gap-3 h-12 shadow-2xl active:scale-95 transition-all text-[11px] rounded-xl border-none leading-none",
                     numPieces > 1
-                      ? "bg-[#F39C63] text-black hover:bg-[#F39C63]/90 shadow-[#F39C63]/20"
-                      : "bg-gradient-to-br from-primary to-green-800 hover:from-primary/90 hover:to-green-700 shadow-green-900/40"
+                      ? "bg-[#85C5F1] text-black hover:bg-[#85C5F1]/90 shadow-[#85C5F1]/20"
+                      : "bg-[#85C5F1] text-black hover:bg-[#85C5F1]/90 shadow-[#85C5F1]/20"
                   )}
                 >
-                  <div className={cn("p-1.5 bg-black/20 rounded-lg", isFiring && "animate-pulse")}>
-                    <Zap className="w-5 h-5 fill-current" />
-                  </div>
-                  {isFiring ? 'EN VUELO' : numPieces > 1 ? `FUEGO DE BATERÍA (${numPieces})` : 'EJECUTAR FUEGO'}
+                  <span className="material-symbols-outlined text-2xl leading-none text-[#171717]">destruction</span>
+                  <span className="leading-none whitespace-pre-line">
+                    {isFiring ? 'EN\nVUELO' : numPieces > 1 ? `FUEGO DE\nBATERÍA (${numPieces})` : 'EJECUTAR\nFUEGO'}
+                  </span>
                 </Button>
 
                 <Button
                   variant="outline"
                   onClick={onReport}
                   disabled={!targetPosition || isGeneratingReport}
-                  className="flex-1 border-border bg-background text-muted-foreground hover:text-foreground hover:bg-secondary rounded-2xl font-black uppercase tracking-widest gap-2 h-12 text-[11px] transition-colors"
+                  className="w-40 border-2 border-[#85C5F1] bg-transparent text-[#85C5F1] hover:bg-[#85C5F1]/10 rounded-xl font-black uppercase tracking-wide gap-2 h-12 text-[11px] leading-none transition-colors"
                 >
-                  <FileText className="w-4 h-4" />
-                  {isGeneratingReport ? 'COMPILANDO...' : 'GENERAR REPORTE'}
+                  <span className="material-symbols-outlined text-xl leading-none text-[#85C5F1]">assignment</span>
+                  <span className="leading-none whitespace-pre-line">
+                    {isGeneratingReport ? 'COMPILANDO...' : 'GENERAR\nREPORTE'}
+                  </span>
                 </Button>
+                {numPieces > 1 && (
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    onClick={() => setShowBatteryDetails(!showBatteryDetails)}
+                    className="w-40 h-12 rounded-xl bg-[#85C5F1] text-[#171717] hover:bg-[#85C5F1]/90 text-[11px] leading-none font-black uppercase tracking-wide"
+                  >
+                    <span className="leading-none whitespace-pre-line">
+                      {showBatteryDetails ? 'OCULTAR DATOS\nDE BATERÍA' : 'VER DATOS\nDE BATERÍA'}
+                    </span>
+                  </Button>
+                )}
               </div>
             </div>
           </div>
@@ -567,22 +555,46 @@ function FiringRow({
   );
 }
 
+function FiringMetric({
+  label,
+  value,
+  unit,
+  className,
+}: {
+  label: string;
+  value: string;
+  unit: string;
+  className: string;
+}) {
+  return (
+    <div className="flex items-baseline justify-between border-b border-[#22313B] py-1 last:border-b-0">
+      <span className={cn("text-xl font-black uppercase", className)}>{label}</span>
+      <span className={cn("text-3xl font-black tracking-tight", className)}>
+        {value}
+        <span className="ml-2 text-2xl lowercase">{unit}</span>
+      </span>
+    </div>
+  );
+}
+
 function CoordinatePlacementRow({
   label,
   buttonLabel,
   value,
   onChange,
   onPlace,
+  onClear,
 }: {
   label: string;
   buttonLabel: string;
   value: CoordinateInput;
   onChange: (field: keyof CoordinateInput, value: string) => void;
   onPlace: () => void;
+  onClear: () => void;
 }) {
   return (
-    <div className="grid grid-cols-[84px_repeat(3,minmax(100px,1fr))_128px] items-end gap-3 border-b border-border/70 pb-3 last:border-b-0 last:pb-0">
-      <div className="pb-3 text-[11px] font-black uppercase tracking-wider text-foreground">
+    <div className="grid grid-cols-[88px_repeat(3,minmax(92px,1fr))_124px_48px] items-end gap-2 border-b border-border/70 pb-2 last:border-b-0 last:pb-0">
+      <div className="pb-2 text-[11px] font-black uppercase tracking-wider text-foreground">
         {label}
       </div>
       <CoordinateField label="Este" value={value.e} onChange={(next) => onChange('e', next)} />
@@ -590,9 +602,15 @@ function CoordinatePlacementRow({
       <CoordinateField label="Altura" value={value.alt} onChange={(next) => onChange('alt', next)} />
       <Button
         onClick={onPlace}
-        className="h-9 rounded-xl bg-[#F39C63] text-[#0A0A0B] hover:bg-[#F39C63]/90 text-[11px] leading-none font-black uppercase tracking-wide"
+        className="h-9 rounded-xl bg-[#C5D8D6] text-black hover:bg-[#C5D8D6]/90 text-[10px] leading-none font-black uppercase tracking-wide"
       >
-        {buttonLabel}
+        <span className="whitespace-pre-line">{buttonLabel.replace(" ", "\n")}</span>
+      </Button>
+      <Button
+        onClick={onClear}
+        className="h-9 rounded-xl bg-[#FF7D73] text-[#171717] hover:bg-[#FF7D73]/90 text-[11px] leading-none font-black uppercase tracking-wide gap-0"
+      >
+        <span className="material-symbols-outlined text-xl leading-none text-[#171717]">delete</span>
       </Button>
     </div>
   );
@@ -615,7 +633,7 @@ function CoordinateField({
         inputMode="numeric"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-background border border-border h-9 text-sm font-mono font-black rounded-xl hover:bg-secondary transition-colors px-3 text-[#F39C63]"
+        className="w-full bg-background border border-border h-8 text-sm font-mono font-black rounded-xl hover:bg-secondary transition-colors px-3 text-[#F39C63]"
       />
     </label>
   );
