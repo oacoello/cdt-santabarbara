@@ -13,6 +13,52 @@ const MAPTILER_KEY = 'VRmMIQ93urJL9gK2BcI1';
 const MAP_STYLE = `https://api.maptiler.com/maps/outdoor-v2-dark/style.json?key=${MAPTILER_KEY}`;
 
 const UTM_GRID_ZONE = 16;
+const UTM_GRID_BAND = 'P';
+const UTM_GRID_LABEL = `${UTM_GRID_ZONE}${UTM_GRID_BAND}`;
+
+const shouldHideNonSettlementLabel = (layer: maplibregl.LayerSpecification) => {
+  if (layer.type !== 'symbol') return false;
+
+  const id = layer.id.toLowerCase();
+  const sourceLayer = String((layer as { 'source-layer'?: unknown })['source-layer'] ?? '').toLowerCase();
+  const text = `${id} ${sourceLayer}`;
+
+  const keepSettlementLabels = [
+    'place',
+    'settlement',
+    'city',
+    'town',
+    'village',
+    'hamlet',
+    'municipality',
+    'neighbourhood',
+    'neighborhood',
+    'suburb',
+    'locality',
+  ];
+
+  if (keepSettlementLabels.some((term) => text.includes(term))) return false;
+
+  return [
+    'poi',
+    'amenity',
+    'business',
+    'shop',
+    'commercial',
+    'tourism',
+    'leisure',
+    'religion',
+    'place_of_worship',
+    'housenumber',
+  ].some((term) => text.includes(term));
+};
+
+const hideNonSettlementLabels = (mapInstance: maplibregl.Map) => {
+  mapInstance.getStyle().layers?.forEach((layer) => {
+    if (!shouldHideNonSettlementLabel(layer)) return;
+    mapInstance.setLayoutProperty(layer.id, 'visibility', 'none');
+  });
+};
 
 const getGridStepMeters = (zoom: number) => {
   if (zoom >= 15) return 1000;
@@ -37,11 +83,12 @@ const buildUtmGridData = (bounds: maplibregl.LngLatBounds, zoom: number) => {
 
   const lineFeatures: GeoJSON.Feature<GeoJSON.LineString>[] = [];
   const labelFeatures: GeoJSON.Feature<GeoJSON.Point>[] = [];
+  const quadrantFeatures: GeoJSON.Feature<GeoJSON.Point>[] = [];
 
   for (let easting = minE; easting <= maxE; easting += step) {
     const coordinates: [number, number][] = [];
     for (let northing = minN; northing <= maxN; northing += sampleStep) {
-      const point = utmToLatLon(easting, northing, UTM_GRID_ZONE, 'P');
+      const point = utmToLatLon(easting, northing, UTM_GRID_ZONE, UTM_GRID_BAND);
       coordinates.push([point.longitude, point.latitude]);
     }
     lineFeatures.push({
@@ -49,7 +96,7 @@ const buildUtmGridData = (bounds: maplibregl.LngLatBounds, zoom: number) => {
       geometry: { type: 'LineString', coordinates },
       properties: { kind: 'easting', label: `E ${Math.round(easting)}` },
     });
-    const labelPoint = utmToLatLon(easting, minN + step * 0.35, UTM_GRID_ZONE, 'P');
+    const labelPoint = utmToLatLon(easting, minN + step * 0.35, UTM_GRID_ZONE, UTM_GRID_BAND);
     labelFeatures.push({
       type: 'Feature',
       geometry: { type: 'Point', coordinates: [labelPoint.longitude, labelPoint.latitude] },
@@ -60,7 +107,7 @@ const buildUtmGridData = (bounds: maplibregl.LngLatBounds, zoom: number) => {
   for (let northing = minN; northing <= maxN; northing += step) {
     const coordinates: [number, number][] = [];
     for (let easting = minE; easting <= maxE; easting += sampleStep) {
-      const point = utmToLatLon(easting, northing, UTM_GRID_ZONE, 'P');
+      const point = utmToLatLon(easting, northing, UTM_GRID_ZONE, UTM_GRID_BAND);
       coordinates.push([point.longitude, point.latitude]);
     }
     lineFeatures.push({
@@ -68,7 +115,7 @@ const buildUtmGridData = (bounds: maplibregl.LngLatBounds, zoom: number) => {
       geometry: { type: 'LineString', coordinates },
       properties: { kind: 'northing', label: `N ${Math.round(northing)}` },
     });
-    const labelPoint = utmToLatLon(minE + step * 0.35, northing, UTM_GRID_ZONE, 'P');
+    const labelPoint = utmToLatLon(minE + step * 0.35, northing, UTM_GRID_ZONE, UTM_GRID_BAND);
     labelFeatures.push({
       type: 'Feature',
       geometry: { type: 'Point', coordinates: [labelPoint.longitude, labelPoint.latitude] },
@@ -76,9 +123,21 @@ const buildUtmGridData = (bounds: maplibregl.LngLatBounds, zoom: number) => {
     });
   }
 
+  for (let easting = minE; easting < maxE; easting += step) {
+    for (let northing = minN; northing < maxN; northing += step) {
+      const center = utmToLatLon(easting + step / 2, northing + step / 2, UTM_GRID_ZONE, UTM_GRID_BAND);
+      quadrantFeatures.push({
+        type: 'Feature',
+        geometry: { type: 'Point', coordinates: [center.longitude, center.latitude] },
+        properties: { label: UTM_GRID_LABEL },
+      });
+    }
+  }
+
   return {
     lines: { type: 'FeatureCollection', features: lineFeatures } as GeoJSON.FeatureCollection<GeoJSON.LineString>,
     labels: { type: 'FeatureCollection', features: labelFeatures } as GeoJSON.FeatureCollection<GeoJSON.Point>,
+    quadrants: { type: 'FeatureCollection', features: quadrantFeatures } as GeoJSON.FeatureCollection<GeoJSON.Point>,
   };
 };
 
@@ -168,6 +227,7 @@ export function TacticalMapMapcn({
 
     map.current.on('load', () => {
       if (!map.current) return;
+      hideNonSettlementLabels(map.current);
       
       map.current.addSource('trajectory', {
         type: 'geojson',
@@ -216,7 +276,8 @@ export function TacticalMapMapcn({
           'text-field': ['get', 'label'],
           'text-size': 11,
           'text-anchor': 'center',
-          'text-allow-overlap': false
+          'text-allow-overlap': true,
+          'text-ignore-placement': true
         },
         paint: {
           'text-color': '#85C5F1',
@@ -226,14 +287,42 @@ export function TacticalMapMapcn({
         }
       });
 
+
+
+      map.current.addSource('utm-grid-quadrants', {
+        type: 'geojson',
+        data: { type: 'FeatureCollection', features: [] }
+      });
+
+      map.current.addLayer({
+        id: 'utm-grid-quadrants',
+        type: 'symbol',
+        source: 'utm-grid-quadrants',
+        layout: {
+          'text-field': ['get', 'label'],
+          'text-size': 15,
+          'text-anchor': 'center',
+          'text-allow-overlap': true,
+          'text-ignore-placement': true
+        },
+        paint: {
+          'text-color': '#D8DEE9',
+          'text-halo-color': '#0A0A0E',
+          'text-halo-width': 2,
+          'text-opacity': 0.35
+        }
+      });
+
       const updateUtmGrid = () => {
         if (!map.current) return;
         const lines = map.current.getSource('utm-grid-lines') as maplibregl.GeoJSONSource | undefined;
         const labels = map.current.getSource('utm-grid-labels') as maplibregl.GeoJSONSource | undefined;
-        if (!lines || !labels) return;
+        const quadrants = map.current.getSource('utm-grid-quadrants') as maplibregl.GeoJSONSource | undefined;
+        if (!lines || !labels || !quadrants) return;
         const grid = buildUtmGridData(map.current.getBounds(), map.current.getZoom());
         lines.setData(grid.lines);
         labels.setData(grid.labels);
+        quadrants.setData(grid.quadrants);
       };
 
       updateUtmGrid();
@@ -379,6 +468,18 @@ export function TacticalMapMapcn({
   return (
     <div className="relative w-full h-full rounded-2xl overflow-hidden border-2 border-[#F39C63] shadow-2xl">
       <div ref={mapContainer} className="w-full h-full bg-[#0A0A0B]" />
+      <div className="absolute top-4 left-4 z-[1000] pointer-events-none">
+        <div className="relative flex h-20 w-20 items-center justify-center rounded-full border border-slate-300/25 bg-[#0A0A0E]/70 shadow-2xl backdrop-blur-md">
+          <div className="absolute h-14 w-[1px] bg-slate-300/40" />
+          <div className="absolute h-[1px] w-14 bg-slate-300/30" />
+          <div className="absolute top-1 text-[10px] font-black tracking-widest text-slate-200">N</div>
+          <div className="absolute right-2 text-[9px] font-black tracking-widest text-slate-400">E</div>
+          <div className="absolute bottom-1 text-[9px] font-black tracking-widest text-slate-500">S</div>
+          <div className="absolute left-2 text-[9px] font-black tracking-widest text-slate-400">W</div>
+          <div className="h-0 w-0 border-x-[7px] border-b-[24px] border-x-transparent border-b-slate-200 drop-shadow-[0_0_8px_rgba(216,222,233,0.4)]" />
+          <div className="absolute bottom-7 h-0 w-0 border-x-[5px] border-t-[18px] border-x-transparent border-t-slate-500/80" />
+        </div>
+      </div>
       <div className="absolute top-4 right-4 z-[1000]">
         <Button
           size="icon"
