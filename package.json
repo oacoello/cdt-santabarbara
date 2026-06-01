@@ -1,6 +1,6 @@
 {
   "name": "santa-barbara-fdc",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "main": "main.js",
   "scripts": {
@@ -12,7 +12,7 @@
     "dev:flex": "next dev --turbopack",
     "build": "next build",
     "start": "next start",
-    "lint": "next lint",
+    "lint": "eslint .",
     "typecheck": "tsc --noEmit",
     "dist": "npm run dist:current",
     "postinstall": "prisma generate",
@@ -68,16 +68,18 @@
     "@types/react-dom": "^19.2.1",
     "electron": "^41.0.0",
     "electron-builder": "^24.13.3",
+    "eslint": "^9.39.4",
+    "eslint-config-next": "^15.5.9",
     "postcss": "^8",
     "prisma": "^7.8.0",
     "tailwindcss": "^3.4.19",
     "ts-node": "^10.9.2",
     "typescript": "^5"
   },
-  "description": "CDT Santa Barbara desktop application",
-  "author": "CDT Santa Barbara",
+  "description": "Centro de tiro de cálculo automático para artillería.",
+  "author": "Universidad de Defensa de Honduras UDH",
   "build": {
-    "appId": "com.santabarbara.cdt",
+    "appId": "udh.santabarbara.cdt",
     "productName": "CDT Santa Barbara",
     "directories": {
       "output": "release"
@@ -114,7 +116,9 @@
           ]
         }
       ],
-      "artifactName": "${productName}-${version}-Windows-${arch}.${ext}"
+      "artifactName": "${productName}-${version}-Windows-${arch}.${ext}",
+      "icon": "assets/icons/icon.ico",
+      "publisherName": "Universidad de Defensa de Honduras UDH"
     },
     "nsis": {
       "oneClick": false,
@@ -129,13 +133,20 @@
         "deb"
       ],
       "category": "Utility",
-      "artifactName": "${productName}-${version}-Linux-${arch}.${ext}"
+      "artifactName": "${productName}-${version}-Linux-${arch}.${ext}",
+      "icon": "assets/icons/icon.png",
+      "maintainer": "Universidad de Defensa de Honduras UDH"
     },
     "npmRebuild": false,
     "compression": "normal",
     "extraMetadata": {
       "main": "main.js",
-      "dependencies": {}
-    }
+      "dependencies": {},
+      "name": "santa-barbara-fdc",
+      "version": "0.2.0",
+      "description": "Centro de tiro de cálculo automático para artillería.",
+      "author": "Universidad de Defensa de Honduras UDH"
+    },
+    "copyright": "Copyright © 2026 - Universidad de Defensa de Honduras UDH"
   }
 }

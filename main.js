@@ -1,4 +1,4 @@
-const { app, BrowserWindow, dialog } = require('electron');
+const { app, BrowserWindow, dialog, Menu, nativeTheme, session } = require('electron');
 const { spawn } = require('child_process');
 const fs = require('fs');
 const http = require('http');
@@ -10,6 +10,7 @@ const HP71_PORT = process.env.CDT_HP71_PORT || '8080';
 
 let nextProcess;
 let hp71Process;
+let geolocationPermission;
 
 function getResourcesPath() {
   return app.isPackaged ? process.resourcesPath : __dirname;
@@ -47,6 +48,62 @@ function waitForServer(url, timeoutMs = 30000) {
     };
 
     tick();
+  });
+}
+
+function isTrustedAppUrl(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    return (
+      (url.hostname === '127.0.0.1' && url.port === NEXT_PORT) ||
+      (url.hostname === 'localhost' && url.port === '9002')
+    );
+  } catch {
+    return false;
+  }
+}
+
+function configurePermissions() {
+  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback, details) => {
+    if (permission !== 'geolocation') {
+      callback(false);
+      return;
+    }
+
+    const requestingUrl = details.requestingUrl || webContents.getURL();
+    if (!isTrustedAppUrl(requestingUrl)) {
+      callback(false);
+      return;
+    }
+
+    if (typeof geolocationPermission === 'boolean') {
+      callback(geolocationPermission);
+      return;
+    }
+
+    const parentWindow = BrowserWindow.fromWebContents(webContents);
+    const options = {
+      type: 'question',
+      buttons: ['Permitir', 'No permitir'],
+      defaultId: 0,
+      cancelId: 1,
+      title: 'Permiso de ubicación',
+      message: 'CDT Santa Barbara solicita acceso a tu ubicación.',
+      detail: 'Se usará únicamente para centrar el mapa táctico en tu posición actual.',
+    };
+    const permissionPrompt = parentWindow
+      ? dialog.showMessageBox(parentWindow, options)
+      : dialog.showMessageBox(options);
+
+    permissionPrompt.then(({ response }) => {
+      geolocationPermission = response === 0;
+      callback(geolocationPermission);
+    }).catch(() => callback(false));
+  });
+
+  session.defaultSession.setPermissionCheckHandler((webContents, permission, requestingOrigin) => {
+    if (permission !== 'geolocation') return false;
+    return isTrustedAppUrl(requestingOrigin || webContents.getURL());
   });
 }
 
@@ -127,12 +184,25 @@ function startHp71Server() {
   hp71Process.on('error', (error) => {
     dialog.showErrorBox('CDT', `No se pudo iniciar HP71: ${error.message}`);
   });
+
+  hp71Process.on('exit', (code) => {
+    if (code !== 0 && !app.isQuitting) {
+      dialog.showErrorBox('CDT', `El servidor HP71 se cerró con código ${code}.`);
+    }
+  });
 }
 
 async function createWindow() {
   const win = new BrowserWindow({
     width: 1200,
     height: 800,
+    minWidth: 1100,
+    minHeight: 720,
+    title: 'CDT Santa Barbara',
+    icon: path.join(__dirname, 'assets', 'icons', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
+    autoHideMenuBar: true,
+    darkTheme: true,
+    backgroundColor: '#0A0A0E',
     webPreferences: {
       nodeIntegration: false,
       contextIsolation: true,
@@ -149,7 +219,14 @@ async function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  app.setName('CDT Santa Barbara');
+  nativeTheme.themeSource = 'dark';
+  Menu.setApplicationMenu(null);
+  configurePermissions();
   startHp71Server();
+  if (!isDev) {
+    await waitForServer(`http://127.0.0.1:${HP71_PORT}`, 15000);
+  }
   startNextServer();
   await createWindow();
 }).catch((error) => {

@@ -152,6 +152,32 @@ export function SimulatorTab({
     }
   };
 
+  const requestCurrentLocation = () => {
+    if (typeof window === "undefined" || !navigator.geolocation) {
+      window.alert("Este entorno no soporta geolocalización.");
+      return;
+    }
+
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        setMapCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
+      },
+      (error) => {
+        const messages: Record<number, string> = {
+          [error.PERMISSION_DENIED]: "Permiso de ubicación denegado.",
+          [error.POSITION_UNAVAILABLE]: "La ubicación no está disponible en este equipo.",
+          [error.TIMEOUT]: "La solicitud de ubicación tardó demasiado.",
+        };
+        window.alert(messages[error.code] ?? "No se pudo obtener la ubicación.");
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 30000,
+      },
+    );
+  };
+
   const internalHandleUpdatePosition = (mode: "PIEZA" | "OBJETIVO", coord: LatLng) => {
     if (mode === "PIEZA") handleSetGun(coord);
     else handleSetTarget(coord);
@@ -184,12 +210,13 @@ export function SimulatorTab({
             fireProgress={fireProgress}
             isGunLocated={isGunLocated}
             mapModelBounds={mapModelBounds}
+            compassClassName="left-[19.25rem] top-4"
           />
         </div>
         <div className="absolute inset-y-0 left-0 z-10 w-[24rem] pointer-events-none bg-gradient-to-r from-[#0A0A0B]/95 via-[#0A0A0B]/70 to-transparent" />
         <div className="absolute inset-y-0 right-0 z-10 w-[24rem] pointer-events-none bg-gradient-to-l from-[#0A0A0B]/95 via-[#0A0A0B]/70 to-transparent" />
 
-        <div className="relative z-20 h-full min-h-0 grid grid-cols-[18rem_1fr_18rem] gap-3 pointer-events-none">
+        <div className="relative z-20 h-full min-h-0 grid grid-cols-[minmax(15rem,18rem)_minmax(20rem,1fr)_minmax(15rem,18rem)] gap-3 pointer-events-none">
         {/* Panel Izquierdo: Localización */}
         <div className="h-full min-h-0 flex flex-col gap-3 pointer-events-auto">
           <div className="bg-[#0A0A0B] p-5 rounded-[20px] border-2 border-[#F39C63] shadow-2xl">
@@ -261,11 +288,7 @@ export function SimulatorTab({
                 size="icon"
                 variant="secondary"
                 className="h-11 w-11 shadow-2xl backdrop-blur-xl border bg-black/60 border-[#F39C63]/40 text-[#F39C63]"
-                onClick={() => {
-                  navigator.geolocation.getCurrentPosition((pos) => {
-                    setMapCenter({ lat: pos.coords.latitude, lng: pos.coords.longitude });
-                  });
-                }}
+                onClick={requestCurrentLocation}
               >
                 <Navigation className="w-5 h-5" />
               </Button>

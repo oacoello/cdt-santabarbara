@@ -20,6 +20,25 @@
 
 BasicEngine engine;
 
+int getServerPort()
+{
+    const char* portEnv = std::getenv("PORT");
+    if(!portEnv)
+        return 8080;
+
+    try
+    {
+        int port = std::stoi(portEnv);
+        if(port > 0 && port <= 65535)
+            return port;
+    }
+    catch(...)
+    {
+    }
+
+    return 8080;
+}
+
 //////////////////////////////////////////////////
 // SERVER THREAD
 //////////////////////////////////////////////////
@@ -27,6 +46,7 @@ BasicEngine engine;
 void runServer()
 {
     httplib::Server server;
+    const int port = getServerPort();
 
     server.Post("/input",[](const httplib::Request& req, httplib::Response& res)
     {
@@ -108,9 +128,9 @@ void runServer()
         res.set_content(content, "text/html");
     });
 
-    std::cout << "Server running on http://127.0.0.1:8080\n";
+    std::cout << "Server running on http://127.0.0.1:" << port << "\n";
 
-    server.listen("127.0.0.1",8080);
+    server.listen("127.0.0.1", port);
 }
 
 //////////////////////////////////////////////////
