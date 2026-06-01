@@ -76,6 +76,33 @@ function readUsersUnsafe(): LocalUser[] {
   return decryptJson<LocalUser[]>(JSON.parse(raw));
 }
 
+function backupUnreadableUsersFile(error: unknown) {
+  const timestamp = new Date().toISOString().replace(/[:.]/g, "-");
+  const backupFile = `${USERS_FILE}.invalid-${timestamp}`;
+
+  try {
+    fs.renameSync(USERS_FILE, backupFile);
+    console.error(
+      `CDT local users store was unreadable and has been backed up to ${backupFile}.`,
+      error
+    );
+  } catch (backupError) {
+    console.error("CDT local users store was unreadable and could not be backed up.", {
+      error,
+      backupError,
+    });
+  }
+}
+
+function readUsers(): LocalUser[] {
+  try {
+    return readUsersUnsafe();
+  } catch (error) {
+    backupUnreadableUsersFile(error);
+    return [];
+  }
+}
+
 function writeUsers(users: LocalUser[]) {
   ensureDataDir();
   fs.writeFileSync(USERS_FILE, JSON.stringify(encryptJson(users), null, 2));
@@ -83,7 +110,7 @@ function writeUsers(users: LocalUser[]) {
 
 export async function ensureLocalUsers() {
   ensureDataDir();
-  const users = readUsersUnsafe();
+  const users = readUsers();
   if (users.length > 0) return;
 
   const now = new Date().toISOString();
@@ -110,7 +137,7 @@ export async function ensureLocalUsers() {
 
 export async function findLocalUserByUsername(username: string) {
   await ensureLocalUsers();
-  return readUsersUnsafe().find((user) => user.username.toLowerCase() === username.toLowerCase()) ?? null;
+  return readUsers().find((user) => user.username.toLowerCase() === username.toLowerCase()) ?? null;
 }
 
 export async function listLocalUserProfiles() {
@@ -126,7 +153,7 @@ export async function createLocalUser(input: {
   canUseSim?: boolean;
 }) {
   await ensureLocalUsers();
-  const users = readUsersUnsafe();
+  const users = readUsers();
 
   if (users.some((user) => user.username.toLowerCase() === input.username.toLowerCase())) {
     return { error: "Tactical ID already exists in the local terminal." };
