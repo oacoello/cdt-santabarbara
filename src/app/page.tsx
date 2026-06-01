@@ -346,22 +346,22 @@ export default function SantaBarbaraFDC() {
   };
 
   return (
-    <main className="relative flex flex-col h-[100dvh] w-full overflow-hidden bg-transparent font-['Stack_Sans_Text']">
+    <main className="cdt-app-shell relative flex h-[100dvh] min-h-[720px] w-full min-w-[1100px] flex-col overflow-auto bg-transparent font-['Stack_Sans_Text']">
 
       {/* CAPA 0: FONDO TÁCTICO FIJO */}
       <div className="fixed inset-0 z-0 pointer-events-none">
         <TacticalBackground />
       </div>
 
-      <Tabs value={activeTab} onValueChange={setActiveTab} className="relative z-10 w-full h-full flex flex-col bg-transparent">
+      <Tabs value={activeTab} onValueChange={setActiveTab} className="relative z-10 flex min-h-0 w-full flex-1 flex-col bg-transparent">
 
         {/* CAPA 1: HEADER TRASLÚCIDO */}
-        <header className="flex-none h-[3.25rem] border-b border-white/10 px-4 flex items-center gap-6 bg-black/20 backdrop-blur-sm">
+        <header className="flex-none h-[3.25rem] border-b border-white/10 px-4 flex items-center gap-6 bg-black/20 backdrop-blur-sm overflow-x-auto scrollbar-hide">
           <div className="flex-none py-2">
             <img src="/logosbcdt.png" alt="Logo" className="h-8 w-auto object-contain" />
           </div>
 
-          <TabsList className="bg-transparent h-full gap-2">
+          <TabsList className="bg-transparent h-full gap-2 flex-none">
             <TabsTrigger
               value="sim"
               className="px-6 uppercase text-[11px] font-black tracking-[0.2em] h-full transition-all data-[state=active]:text-[#F39C63]"
@@ -390,7 +390,7 @@ export default function SantaBarbaraFDC() {
         </header>
 
         {/* CAPA 2: CONTENIDO PRINCIPAL */}
-        <div className="flex-1 relative overflow-hidden bg-transparent">
+        <div className="flex-1 min-h-0 relative overflow-hidden bg-transparent">
 
           {/* SIMULADOR */}
           <TabsContent value="sim" forceMount className="h-full w-full m-0 p-0 border-none bg-transparent data-[state=inactive]:hidden">

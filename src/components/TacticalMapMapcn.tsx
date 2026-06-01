@@ -159,6 +159,7 @@ interface TacticalMapProps {
   isGunLocated?: boolean;
   mapModelBounds?: [LatLng, LatLng] | null;
   enableClickPlacement?: boolean;
+  compassClassName?: string;
 }
 
 /**
@@ -168,7 +169,7 @@ const get3DParabolicPath = (start: LatLng, end: LatLng, progress: number, segmen
   const points = [];
   const currentSegments = Math.floor(segments * (progress / 100));
   
-  // Cálculo de distancia aproximada en metros para una parábola realista
+  // CÃ¡lculo de distancia aproximada en metros para una parÃ¡bola realista
   const R = 6371e3; // Radio de la Tierra
   const dLat = (end.lat - start.lat) * Math.PI / 180;
   const dLon = (end.lng - start.lng) * Math.PI / 180;
@@ -177,7 +178,7 @@ const get3DParabolicPath = (start: LatLng, end: LatLng, progress: number, segmen
             Math.sin(dLon/2) * Math.sin(dLon/2);
   const distanceInMeters = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a)) * R;
 
-  // Altura máxima: 1/4 de la distancia (típico de trayectoria parabólica de artillería)
+  // Altura mÃ¡xima: 1/4 de la distancia (tÃ­pico de trayectoria parabÃ³lica de artillerÃ­a)
   const maxHeight = distanceInMeters * 0.25; 
 
   for (let i = 0; i <= currentSegments; i++) {
@@ -207,10 +208,50 @@ export function TacticalMapMapcn({
   fireProgress = 0,
   mapModelBounds,
   enableClickPlacement = false,
+  compassClassName,
 }: TacticalMapProps) {
   const mapContainer = useRef<HTMLDivElement>(null);
   const map = useRef<maplibregl.Map | null>(null);
   const markersRef = useRef<{ [key: string]: maplibregl.Marker }>({});
+  const [mapBearing, setMapBearing] = useState(0);
+  const [mapPitch, setMapPitch] = useState(65);
+  const [isLocating, setIsLocating] = useState(false);
+
+  const requestUserLocation = () => {
+    if (typeof window === 'undefined' || !navigator.geolocation) {
+      window.alert('Este entorno no soporta geolocalización.');
+      return;
+    }
+
+    setIsLocating(true);
+    navigator.geolocation.getCurrentPosition(
+      (pos) => {
+        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
+        onCenterChange?.(coords);
+        const mapInstance = map.current;
+        mapInstance?.flyTo({
+          center: [coords.lng, coords.lat],
+          zoom: Math.max(mapInstance.getZoom(), 15),
+          duration: 900,
+        });
+        setIsLocating(false);
+      },
+      (error) => {
+        setIsLocating(false);
+        const messages: Record<number, string> = {
+          [error.PERMISSION_DENIED]: 'Permiso de ubicación denegado.',
+          [error.POSITION_UNAVAILABLE]: 'La ubicación no está disponible en este equipo.',
+          [error.TIMEOUT]: 'La solicitud de ubicación tardó demasiado.',
+        };
+        window.alert(messages[error.code] ?? 'No se pudo obtener la ubicación.');
+      },
+      {
+        enableHighAccuracy: true,
+        timeout: 15000,
+        maximumAge: 30000,
+      },
+    );
+  };
 
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
@@ -220,10 +261,20 @@ export function TacticalMapMapcn({
       style: MAP_STYLE,
       center: [mapCenter.lng, mapCenter.lat],
       zoom: 14,
-      pitch: 65, // Inclinación fuerte para ver el arco volar
+      pitch: 65, // InclinaciÃ³n fuerte para ver el arco volar
       bearing: 0,
       attributionControl: false,
     });
+
+    const syncMapOrientation = () => {
+      if (!map.current) return;
+      setMapBearing(map.current.getBearing());
+      setMapPitch(map.current.getPitch());
+    };
+
+    map.current.on('move', syncMapOrientation);
+    map.current.on('rotate', syncMapOrientation);
+    map.current.on('pitch', syncMapOrientation);
 
     map.current.on('load', () => {
       if (!map.current) return;
@@ -350,7 +401,7 @@ export function TacticalMapMapcn({
     }
   }, [mapCenter]);
 
-  // Actualización de Trayectoria con elevación Z
+  // ActualizaciÃ³n de Trayectoria con elevaciÃ³n Z
   useEffect(() => {
     if (!map.current || !map.current.isStyleLoaded()) return;
     const source = map.current.getSource('trajectory') as maplibregl.GeoJSONSource;
@@ -468,31 +519,51 @@ export function TacticalMapMapcn({
   return (
     <div className="relative w-full h-full rounded-2xl overflow-hidden border-2 border-[#F39C63] shadow-2xl">
       <div ref={mapContainer} className="w-full h-full bg-[#0A0A0B]" />
-      <div className="absolute top-4 left-4 z-[1000] pointer-events-none">
-        <div className="relative flex h-20 w-20 items-center justify-center rounded-full border border-slate-300/25 bg-[#0A0A0E]/70 shadow-2xl backdrop-blur-md">
-          <div className="absolute h-14 w-[1px] bg-slate-300/40" />
-          <div className="absolute h-[1px] w-14 bg-slate-300/30" />
+      <button
+        type="button"
+        title="Restablecer norte e inclinación"
+        className={cn(
+          "absolute top-4 left-4 z-[1000] flex flex-col items-center gap-1 rounded-2xl border border-slate-300/25 bg-[#0A0A0E]/75 px-2 py-2 shadow-2xl backdrop-blur-md transition hover:border-slate-200/45 hover:bg-[#0A0A0E]/90",
+          compassClassName,
+        )}
+        onClick={() => {
+          map.current?.easeTo({ bearing: 0, pitch: 65, duration: 700 });
+        }}
+      >
+        <div className="relative flex h-20 w-20 items-center justify-center rounded-full border border-slate-300/20 bg-slate-400/5">
+          <div className="absolute h-14 w-[1px] bg-slate-300/35" />
+          <div className="absolute h-[1px] w-14 bg-slate-300/25" />
           <div className="absolute top-1 text-[10px] font-black tracking-widest text-slate-200">N</div>
           <div className="absolute right-2 text-[9px] font-black tracking-widest text-slate-400">E</div>
           <div className="absolute bottom-1 text-[9px] font-black tracking-widest text-slate-500">S</div>
           <div className="absolute left-2 text-[9px] font-black tracking-widest text-slate-400">W</div>
-          <div className="h-0 w-0 border-x-[7px] border-b-[24px] border-x-transparent border-b-slate-200 drop-shadow-[0_0_8px_rgba(216,222,233,0.4)]" />
-          <div className="absolute bottom-7 h-0 w-0 border-x-[5px] border-t-[18px] border-x-transparent border-t-slate-500/80" />
+          <div
+            className="absolute inset-0 flex items-center justify-center transition-transform duration-100"
+            style={{ transform: `rotate(${-mapBearing}deg)` }}
+          >
+            <div className="absolute -translate-y-3 h-0 w-0 border-x-[7px] border-b-[28px] border-x-transparent border-b-slate-100 drop-shadow-[0_0_8px_rgba(216,222,233,0.45)]" />
+            <div className="absolute translate-y-4 h-0 w-0 border-x-[5px] border-t-[20px] border-x-transparent border-t-slate-500/85" />
+          </div>
+          <div
+            className="absolute bottom-4 h-[3px] w-9 rounded-full bg-[#85C5F1]/70 transition-transform duration-100"
+            style={{ transform: `perspective(60px) rotateX(${Math.min(mapPitch, 75)}deg)` }}
+          />
         </div>
-      </div>
+        <div className="flex w-full items-center justify-between gap-2 px-1 font-mono text-[9px] font-black text-slate-300/85">
+          <span>{Math.round((mapBearing + 360) % 360).toString().padStart(3, '0')}°</span>
+          <span>{Math.round(mapPitch)}°</span>
+        </div>
+      </button>
       <div className="absolute top-4 right-4 z-[1000]">
         <Button
           size="icon"
           variant="secondary"
+          disabled={isLocating}
+          title={isLocating ? 'Solicitando ubicación...' : 'Solicitar ubicación actual'}
           className="h-10 w-10 shadow-2xl backdrop-blur-xl border bg-black/60 border-[#F39C63]/40 text-[#F39C63]"
-          onClick={() => {
-            navigator.geolocation.getCurrentPosition((pos) => {
-              const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-              if (onCenterChange) onCenterChange(coords);
-            });
-          }}
+          onClick={requestUserLocation}
         >
-          <Navigation className="w-5 h-5" />
+          <Navigation className={cn("w-5 h-5", isLocating && "animate-pulse")} />
         </Button>
       </div>
     </div>
