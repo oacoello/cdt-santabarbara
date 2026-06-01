@@ -7,6 +7,12 @@ const path = require('path');
 const isDev = process.env.NODE_ENV === 'development';
 const NEXT_PORT = process.env.CDT_NEXT_PORT || '3210';
 const HP71_PORT = process.env.CDT_HP71_PORT || '8080';
+const DEFAULT_AUTH_SECRET = 'santa-barbara-secret-key-2026-tactical-direction';
+const SPLASH_WIDTH = 780;
+const SPLASH_HEIGHT = 524;
+const SPLASH_FALLBACK_MS = 3500;
+const SPLASH_MAX_MS = 15000;
+const SPLASH_TERMINAL_FRAME_DELAY_MS = 10000;
 
 let nextProcess;
 let hp71Process;
@@ -14,6 +20,10 @@ let geolocationPermission;
 
 function getResourcesPath() {
   return app.isPackaged ? process.resourcesPath : __dirname;
+}
+
+function getAssetPath(...segments) {
+  return path.join(getResourcesPath(), 'assets', ...segments);
 }
 
 function getDatabaseUrl() {
@@ -48,6 +58,75 @@ function waitForServer(url, timeoutMs = 30000) {
     };
 
     tick();
+  });
+}
+
+function getGifDurationMs(filePath) {
+  try {
+    const buffer = fs.readFileSync(filePath);
+    let duration = 0;
+
+    for (let i = 0; i < buffer.length - 9; i += 1) {
+      if (buffer[i] === 0x21 && buffer[i + 1] === 0xf9 && buffer[i + 2] === 0x04) {
+        const frameDelay = buffer.readUInt16LE(i + 4) * 10;
+
+        if (frameDelay >= SPLASH_TERMINAL_FRAME_DELAY_MS) {
+          break;
+        }
+
+        duration += frameDelay;
+      }
+    }
+
+    if (duration <= 0) return SPLASH_FALLBACK_MS;
+
+    return Math.min(duration, SPLASH_MAX_MS);
+  } catch {
+    return SPLASH_FALLBACK_MS;
+  }
+}
+
+function showSplashWindow() {
+  const splashPath = getAssetPath('splash_cdt.gif');
+
+  if (!fs.existsSync(splashPath)) {
+    return Promise.resolve();
+  }
+
+  const splash = new BrowserWindow({
+    width: SPLASH_WIDTH,
+    height: SPLASH_HEIGHT,
+    frame: false,
+    transparent: false,
+    resizable: false,
+    alwaysOnTop: true,
+    center: true,
+    show: false,
+    backgroundColor: '#000000',
+    webPreferences: {
+      nodeIntegration: false,
+      contextIsolation: true,
+    },
+  });
+
+  splash.loadFile(splashPath);
+  splash.once('ready-to-show', () => splash.show());
+
+  return new Promise((resolve) => {
+    let resolved = false;
+    const finish = () => {
+      if (resolved) return;
+      resolved = true;
+      if (!splash.isDestroyed()) {
+        splash.close();
+      }
+      resolve();
+    };
+
+    const duration = getGifDurationMs(splashPath);
+    splash.once('closed', finish);
+    splash.webContents.once('did-fail-load', finish);
+    setTimeout(finish, duration);
   });
 }
 
@@ -127,8 +206,10 @@ function startNextServer() {
       HOSTNAME: '127.0.0.1',
       DATABASE_URL: getDatabaseUrl(),
       CDT_DATA_DIR: app.getPath('userData'),
-      AUTH_SECRET: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || 'cdt-local-desktop-secret',
-      NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || 'cdt-local-desktop-secret',
+      AUTH_SECRET: process.env.AUTH_SECRET || process.env.NEXTAUTH_SECRET || DEFAULT_AUTH_SECRET,
+      NEXTAUTH_SECRET: process.env.NEXTAUTH_SECRET || process.env.AUTH_SECRET || DEFAULT_AUTH_SECRET,
+      AUTH_TRUST_HOST: 'true',
+      AUTH_URL: `http://127.0.0.1:${NEXT_PORT}`,
       NEXTAUTH_URL: `http://127.0.0.1:${NEXT_PORT}`,
       HP71_BACKEND_URL: `http://127.0.0.1:${HP71_PORT}`,
     },
@@ -199,9 +280,10 @@ async function createWindow() {
     minWidth: 1100,
     minHeight: 720,
     title: 'CDT Santa Barbara',
-    icon: path.join(__dirname, 'assets', 'icons', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
+    icon: getAssetPath('icons', process.platform === 'win32' ? 'icon.ico' : 'icon.png'),
     autoHideMenuBar: true,
     darkTheme: true,
+    show: false,
     backgroundColor: '#0A0A0E',
     webPreferences: {
       nodeIntegration: false,
@@ -216,6 +298,8 @@ async function createWindow() {
     await waitForServer(appUrl);
     win.loadURL(appUrl);
   }
+
+  return win;
 }
 
 app.whenReady().then(async () => {
@@ -223,12 +307,17 @@ app.whenReady().then(async () => {
   nativeTheme.themeSource = 'dark';
   Menu.setApplicationMenu(null);
   configurePermissions();
+  const splashPromise = showSplashWindow();
   startHp71Server();
   if (!isDev) {
     await waitForServer(`http://127.0.0.1:${HP71_PORT}`, 15000);
   }
   startNextServer();
-  await createWindow();
+  const win = await createWindow();
+  await splashPromise;
+  win.maximize();
+  win.show();
+  win.focus();
 }).catch((error) => {
   dialog.showErrorBox('CDT', error.message);
 });

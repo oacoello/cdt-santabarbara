@@ -95,6 +95,13 @@
     ],
     "extraResources": [
       {
+        "from": "assets",
+        "to": "assets",
+        "filter": [
+          "**/*"
+        ]
+      },
+      {
         "from": ".next/standalone",
         "to": "next/standalone"
       },
