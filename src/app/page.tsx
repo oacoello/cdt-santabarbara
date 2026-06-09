@@ -418,7 +418,7 @@ export default function SantaBarbaraFDC() {
           {/* CALCULADORA */}
           <TabsContent value="manual" forceMount className="h-full w-full m-0 border-none bg-transparent data-[state=inactive]:hidden p-4">
             <div className="grid h-full min-h-0 grid-cols-1 xl:grid-cols-[minmax(0,1.15fr)_minmax(420px,0.85fr)] gap-4">
-              <div className="min-h-0 flex items-center justify-center overflow-auto">
+              <div className="min-h-0 flex items-start justify-center overflow-auto">
                 <HP71Emulator
                   userName={loggedUser?.name ?? undefined}
                   logSessionId={logSessionId}

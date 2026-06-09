@@ -83,3 +83,26 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ error: "Error interno" }, { status: 500 });
   }
 }
+
+
+export async function DELETE(request: NextRequest) {
+  try {
+    const { searchParams } = new URL(request.url);
+    const user = safeSegment(searchParams.get("user"), "sin-perfil");
+    const sessionId = searchParams.get("sessionId");
+
+    if (!sessionId) {
+      return NextResponse.json({ error: "Falta sessionId" }, { status: 400 });
+    }
+
+    const logPath = getLogPath(user, sessionId);
+    if (fs.existsSync(logPath)) {
+      fs.unlinkSync(logPath);
+    }
+
+    return NextResponse.json({ success: true });
+  } catch (error) {
+    console.error("Error borrando log HP71:", error);
+    return NextResponse.json({ error: "Error interno" }, { status: 500 });
+  }
+}

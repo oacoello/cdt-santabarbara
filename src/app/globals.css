@@ -133,3 +133,159 @@ header h1 {
     -ms-overflow-style: none;
     scrollbar-width: none;
 }
+
+
+/* --- CDT responsive scaling guard ---
+   Windows display scaling (125%+) reduces the effective CSS viewport.
+   The tactical UI must adapt by available HEIGHT first, not only width. */
+.cdt-simulator-tab {
+  min-height: 0;
+}
+
+.cdt-map-stage {
+  min-height: clamp(20rem, 58dvh, 44rem);
+}
+
+.cdt-control-dock {
+  max-height: min(38dvh, 21rem);
+  overflow: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(243, 156, 99, 0.6) rgba(10, 10, 14, 0.35);
+}
+
+.cdt-control-dock::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+.cdt-control-dock::-webkit-scrollbar-thumb {
+  background: rgba(243, 156, 99, 0.6);
+  border-radius: 999px;
+}
+
+.cdt-control-dock::-webkit-scrollbar-track {
+  background: rgba(10, 10, 14, 0.35);
+}
+
+.cdt-control-panel {
+  min-width: min-content;
+}
+
+.cdt-section-card {
+  height: clamp(14.5rem, 24dvh, 18rem) !important;
+}
+
+.cdt-map-overlay {
+  grid-template-columns: minmax(14rem, 18rem) minmax(18rem, 1fr) minmax(14rem, 18rem);
+}
+
+.cdt-side-panel {
+  overflow-y: auto;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(243, 156, 99, 0.45) transparent;
+}
+
+@media (max-height: 980px), (max-width: 1680px) {
+  .cdt-control-inner {
+    padding: 0.55rem !important;
+  }
+
+  .cdt-control-sections {
+    gap: 0.55rem !important;
+  }
+
+  .cdt-section-card {
+    height: clamp(13rem, 23dvh, 16rem) !important;
+    padding-top: 1.65rem !important;
+    padding-bottom: 0.65rem !important;
+  }
+
+  .cdt-section-card h2 {
+    font-size: 1rem !important;
+  }
+
+  .cdt-section-card input,
+  .cdt-section-card button,
+  .cdt-section-card [role="combobox"] {
+    min-height: 0 !important;
+  }
+
+  .cdt-firing-metric {
+    padding-top: 0.12rem !important;
+    padding-bottom: 0.12rem !important;
+  }
+
+  .cdt-firing-label {
+    font-size: clamp(0.85rem, 1.3dvh, 1.15rem) !important;
+  }
+
+  .cdt-firing-value {
+    font-size: clamp(1.45rem, 3dvh, 2.35rem) !important;
+  }
+
+  .cdt-firing-value span {
+    font-size: clamp(1rem, 2.2dvh, 1.55rem) !important;
+  }
+
+  .cdt-coordinate-row {
+    grid-template-columns: 5rem repeat(3, minmax(5.2rem, 1fr)) 6.8rem 2.55rem !important;
+    gap: 0.45rem !important;
+    padding-bottom: 0.45rem !important;
+  }
+
+  .cdt-coordinate-input {
+    height: 1.75rem !important;
+    font-size: 0.78rem !important;
+  }
+}
+
+@media (max-height: 860px), (max-width: 1500px) {
+  .cdt-map-stage {
+    min-height: clamp(18rem, 54dvh, 36rem);
+    padding: 0.5rem !important;
+  }
+
+  .cdt-control-dock {
+    max-height: 34dvh;
+  }
+
+  .cdt-section-card {
+    height: clamp(12rem, 22dvh, 14rem) !important;
+    border-radius: 14px !important;
+    padding-left: 0.75rem !important;
+    padding-right: 0.75rem !important;
+  }
+
+  .cdt-map-overlay {
+    grid-template-columns: minmax(12.5rem, 16rem) minmax(16rem, 1fr) minmax(12.5rem, 16rem);
+    gap: 0.5rem !important;
+  }
+
+  .cdt-side-panel {
+    gap: 0.5rem !important;
+  }
+
+  .cdt-side-panel > div {
+    padding: 0.8rem !important;
+    border-radius: 16px !important;
+  }
+}
+
+@media (max-height: 760px) {
+  .cdt-map-stage {
+    min-height: 16rem;
+  }
+
+  .cdt-control-dock {
+    max-height: 32dvh;
+  }
+
+  .cdt-section-card {
+    height: auto !important;
+    min-height: 11.5rem !important;
+  }
+
+  .cdt-control-sections {
+    align-items: stretch !important;
+  }
+}

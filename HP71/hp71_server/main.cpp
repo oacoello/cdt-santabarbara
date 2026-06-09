@@ -51,10 +51,30 @@ void runServer()
     server.Post("/input",[](const httplib::Request& req, httplib::Response& res)
     {
         std::string cmd = req.get_param_value("cmd");
-        std::string result = engine.execute(cmd);
         res.set_header("Access-Control-Allow-Origin", "*");
         res.set_header("Access-Control-Allow-Headers", "Content-Type");
-        res.set_content(result,"text/plain");
+
+        try
+        {
+            std::string result = engine.execute(cmd);
+            res.set_content(result,"text/plain");
+        }
+        catch(const std::exception& e)
+        {
+            std::string error = std::string("ERROR: ") + e.what();
+            res.set_content(error,"text/plain");
+        }
+        catch(...)
+        {
+            res.set_content("ERROR: UNKNOWN","text/plain");
+        }
+    });
+
+    server.Get("/record", [](const httplib::Request&, httplib::Response& res)
+    {
+        res.set_header("Access-Control-Allow-Origin", "*");
+        res.set_header("Access-Control-Allow-Headers", "Content-Type");
+        res.set_content(engine.recordDataJson(), "application/json");
     });
 
     server.Options("/input", [](const httplib::Request&, httplib::Response& res)
