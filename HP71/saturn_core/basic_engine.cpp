@@ -994,6 +994,8 @@ static double shift_ud = 0.0;
 static double last_dist_solution = 0.0;
 static double last_def_solution = 0.0;
 static double last_qe_solution = 0.0;
+static int last_chg_solution = 0;
+static double last_tof_solution = 0.0;
 
 //////////////////////////////////////////////////
 // INSTANTANEOUS PDA / SHIFT CORR VARIABLES
@@ -1591,6 +1593,8 @@ std::string BasicEngine::execute(const std::string& input)
             last_def_solution = def_ref;
             last_dist_solution = dist;
             last_qe_solution = qe_final_ref;
+            last_chg_solution = chg_tmp;
+            last_tof_solution = tof_tmp;
         }
     return out.str();
 };
@@ -5055,6 +5059,27 @@ std::string BasicEngine::mainMenu(){ return "MAIN (? 1 3 4 5 7 X *)"; }
 std::string BasicEngine::fireMenu(){ return "FM (? 1 2 3 4 R E P X *)"; }
 std::string BasicEngine::afuMenu(){ return "AFU INDEX (? 1 3 5 *)"; }
 std::string BasicEngine::ammoMenu(){ return "AMMO FILE (? I *)"; }
+
+std::string BasicEngine::recordDataJson()
+{
+    std::stringstream ss;
+    ss << std::fixed << std::setprecision(1);
+    ss << "{";
+    ss << "\"targetNumber\":" << current_knpt << ",";
+    ss << "\"pieceNumber\":" << (base_piece_index + 1) << ",";
+    ss << "\"distance\":" << std::round(last_dist_solution) << ",";
+    ss << "\"deflection\":" << std::round(last_def_solution) << ",";
+    ss << "\"qe\":" << (std::round(last_qe_solution * 10.0) / 10.0) << ",";
+    ss << "\"angleT\":" << std::round(inst_angle_t) << ",";
+    ss << "\"tof\":" << last_tof_solution << ",";
+    ss << "\"charge\":" << last_chg_solution << ",";
+    ss << "\"observerDirection\":" << std::round(inst_last_dir) << ",";
+    ss << "\"correctionLR\":" << std::round(inst_lr_shift) << ",";
+    ss << "\"correctionAD\":" << std::round(inst_ad_shift) << ",";
+    ss << "\"correctionUD\":" << std::round(inst_ud_shift);
+    ss << "}";
+    return ss.str();
+}
 
 //////////////////////////////////////////////////
 // RESET

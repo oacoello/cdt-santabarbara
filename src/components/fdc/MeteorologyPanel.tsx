@@ -13,18 +13,52 @@ interface MeteorologyPanelProps {
 export function MeteorologyPanel({ position }: MeteorologyPanelProps) {
   const [met, setMet] = useState<MetData | null>(null);
   const [loading, setLoading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+
+  const getRealLocation = () =>
+    new Promise<LatLng>((resolve, reject) => {
+      if (typeof window === 'undefined' || !navigator.geolocation) {
+        reject(new Error('Este equipo no soporta geolocalización.'));
+        return;
+      }
+
+      navigator.geolocation.getCurrentPosition(
+        (pos) => resolve({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
+        (geoError) => {
+          const messages: Record<number, string> = {
+            [geoError.PERMISSION_DENIED]: 'Permiso de ubicación denegado.',
+            [geoError.POSITION_UNAVAILABLE]: 'Ubicación no disponible.',
+            [geoError.TIMEOUT]: 'La ubicación tardó demasiado.',
+          };
+          reject(new Error(messages[geoError.code] ?? 'No se pudo obtener la ubicación real.'));
+        },
+        {
+          enableHighAccuracy: true,
+          timeout: 15000,
+          maximumAge: 300000,
+        },
+      );
+    });
 
   const updateMet = async () => {
     setLoading(true);
-    // getTacticalMet espera un objeto LatLng, no dos argumentos.
-    const data = getTacticalMet(position);
-    setMet(data);
-    setLoading(false);
+    setError(null);
+
+    try {
+      const realPosition = await getRealLocation();
+      const data = await getTacticalMet(realPosition);
+      setMet(data);
+    } catch (err) {
+      setMet(null);
+      setError(err instanceof Error ? err.message : 'No se pudo sincronizar meteorología real.');
+    } finally {
+      setLoading(false);
+    }
   };
 
   useEffect(() => {
     updateMet();
-  }, [position.lat, position.lng]);
+  }, []);
 
   return (
     <Card className="p-3 bg-transparent border-[#F39C63] border-2 w-72 backdrop-blur-sm rounded-xl">
@@ -46,17 +80,22 @@ export function MeteorologyPanel({ position }: MeteorologyPanelProps) {
 
       {!met ? (
         <div className="py-8 text-center text-[10px] font-black uppercase tracking-widest text-white/30">
-          {loading ? 'Sincronizando...' : 'Sin Datos'}
+          {loading ? 'Sincronizando GPS...' : error ?? 'Sin Datos Reales'}
         </div>
       ) : (
-        <div className="grid grid-cols-2 gap-2">
-          <MetStat icon={<Thermometer />} label="Temp" value={met.temp} unit="°C" />
-          <MetStat icon={<Gauge />} label="Presión" value={met.pressure} unit="hPa" />
-          <MetStat icon={<Wind />} label="Viento" value={met.windSpeed} unit="m/s" />
-          <MetStat icon={<Wind />} label="Dir" value={met.windDirMils} unit="MIL" isSpecial />
-          <MetStat icon={<Droplets />} label="Humedad" value={met.humidity} unit="%" />
-          <MetStat icon={<Cloud />} label="Altitud" value={met.elevation} unit="m" />
-        </div>
+        <>
+          <div className="mb-2 rounded-lg border border-[#F39C63]/20 bg-black/20 px-2 py-1.5 text-[9px] font-bold uppercase tracking-wider text-white/40">
+            {met.source} · GPS real · {met.observedAt ?? 'actual'}
+          </div>
+          <div className="grid grid-cols-2 gap-2">
+            <MetStat icon={<Thermometer />} label="Temp" value={met.temp} unit="°C" />
+            <MetStat icon={<Gauge />} label="Presión" value={met.pressure} unit="hPa" />
+            <MetStat icon={<Wind />} label="Viento" value={met.windSpeed} unit="m/s" />
+            <MetStat icon={<Wind />} label="Dir" value={met.windDirMils} unit="MIL" isSpecial />
+            <MetStat icon={<Droplets />} label="Humedad" value={met.humidity} unit="%" />
+            <MetStat icon={<Cloud />} label="Altitud" value={met.elevation} unit="m" />
+          </div>
+        </>
       )}
     </Card>
   );

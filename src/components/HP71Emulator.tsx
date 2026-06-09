@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
+import { Pin, PinOff, Trash2, X } from "lucide-react";
 
 // ---------- Funciones auxiliares ----------
 function extractBasePiece(text: string): number | null {
@@ -101,6 +102,72 @@ type PieceResult = {
   text: string;
 };
 
+type MissionCapture = {
+  id: string;
+  title: string;
+  text: string;
+  pinned: boolean;
+  createdAt: number;
+};
+
+type Hp71RecordData = {
+  targetNumber?: number;
+  pieceNumber?: number;
+  distance?: number;
+  deflection?: number;
+  qe?: number;
+  angleT?: number;
+  tof?: number;
+  charge?: number;
+  observerDirection?: number;
+  correctionLR?: number;
+  correctionAD?: number;
+  correctionUD?: number;
+};
+
+type Hp71RecordRow = Pick<
+  Hp71RecordData,
+  "targetNumber" | "pieceNumber" | "distance" | "charge" | "tof" | "deflection" | "qe"
+> & {
+  id: string;
+};
+
+type Hp71RecordInputField = "observerDirection" | "correctionLR" | "correctionAD" | "correctionUD";
+
+
+
+const RESULT_KEYS = ["MISION", "MISSION", "DIST", "AZ", "DEF", "CHG", "QE", "TOF", "FUZE"];
+const PIECE_HEADER_PATTERN = /^[\s\-–—]*PIECE\s+(\d+)[\s\-–—]*$/i;
+
+function normalizePieceHeader(line: string): string {
+  const match = line.trim().match(PIECE_HEADER_PATTERN);
+  return match ? `----- PIECE ${match[1]} -----` : line.trim();
+}
+
+function extractMissionResultCapture(piece: PieceResult): string | null {
+  const lines = piece.text.split(/\r?\n/).map((line) => line.trim()).filter(Boolean);
+  if (lines.length === 0) return null;
+
+  const output: string[] = [normalizePieceHeader(lines[0])];
+  let foundMission = false;
+
+  for (const line of lines.slice(1)) {
+    const key = line.split(/\s+/)[0]?.toUpperCase();
+    if (key === "COMP" || key === "TESON") break;
+    if (!RESULT_KEYS.includes(key)) continue;
+
+    output.push(line.toUpperCase());
+    if (key === "MISION" || key === "MISSION") foundMission = true;
+    if (key === "FUZE") break;
+  }
+
+  const hasRequiredResult = output.some((line) => /^DIST\s+/i.test(line))
+    && output.some((line) => /^AZ\s+/i.test(line))
+    && output.some((line) => /^FUZE\s+/i.test(line));
+
+  return foundMission && hasRequiredResult ? output.join("\n") : null;
+}
+
 function parsePieces(text: string): PieceResult[] {
   const lines = text.split(/\r?\n/);
   const result: PieceResult[] = [];
@@ -109,7 +176,7 @@ function parsePieces(text: string): PieceResult[] {
 
   for (const line of lines) {
     const clean = line.trim();
-    const pieceMatch = clean.match(/^-+\s*PIECE\s+(\d+)\s*-+$/i);
+    const pieceMatch = clean.match(PIECE_HEADER_PATTERN);
 
     if (pieceMatch) {
       if (current.length > 0 && currentNumber !== null) {
@@ -181,6 +248,207 @@ async function fetchHp71Display(command: string): Promise<string> {
   const proxyRes = await fetch(`/api/hp71?cmd=${encoded}`, { method: "POST" });
   const json = await proxyRes.json();
   return json.display || "";
+}
+
+async function fetchHp71Record(): Promise<Hp71RecordData | null> {
+  try {
+    if (process.env.NODE_ENV === "development") {
+      const directRes = await fetch("http://127.0.0.1:8080/record", { cache: "no-store" });
+      if (directRes.ok) return await directRes.json();
+    }
+  } catch {
+    // Fall back to the Next proxy below.
+  }
+
+  try {
+    const proxyRes = await fetch("/api/hp71/record", { cache: "no-store" });
+    if (!proxyRes.ok) return null;
+    const json = await proxyRes.json();
+    return "error" in json ? null : json;
+  } catch {
+    return null;
+  }
+}
+
+function cleanNumber(value: string | undefined): number | undefined {
+  if (!value || /NO\s+DATA/i.test(value)) return undefined;
+  const parsed = Number(value);
+  return Number.isFinite(parsed) ? parsed : undefined;
+}
+
+function parseRecordFromDisplay(text: string, fallbackPiece: number): Hp71RecordData {
+  const pieces = parsePieces(text);
+  const piece = pieces.find((item) => item.number === fallbackPiece) ?? pieces[0];
+  const source = piece?.text ?? text;
+
+  return {
+    pieceNumber: piece?.number,
+    distance: cleanNumber(source.match(/\bDIST\s+([^\s]+)/i)?.[1]),
+    deflection: cleanNumber(source.match(/\bDEF\s+([^\s]+)/i)?.[1]),
+    charge: cleanNumber(source.match(/\bCHG\s+([^\s]+)/i)?.[1]),
+    qe: cleanNumber(source.match(/\bQE\s+([^\s]+)/i)?.[1]),
+    tof: cleanNumber(source.match(/\bTOF\s+([^\s]+)/i)?.[1]),
+    angleT: cleanNumber(text.match(/\bANG\s+T(?:\s+\(P\*\):)?\s*([^\s]+)/i)?.[1]),
+    observerDirection: cleanNumber(text.match(/\bDIR(?:\s+\(P\s+X\):)?\s*([^\s]+)/i)?.[1]),
+    correctionLR: cleanNumber(text.match(/\bLR\s+SHIFT\s+([^\s]+)/i)?.[1]),
+    correctionAD: cleanNumber(text.match(/\bAD\s+SHIFT\s+([^\s]+)/i)?.[1]),
+    correctionUD: cleanNumber(text.match(/\bUD\s+SHIFT\s+([^\s]+)/i)?.[1]),
+  };
+}
+
+function parsePieceRecordRow(piece: PieceResult, context: Hp71RecordData): Hp71RecordRow | null {
+  const parsed = parseRecordFromDisplay(piece.text, piece.number);
+  const row = definedRecordPatch({
+    targetNumber: context.targetNumber,
+    pieceNumber: parsed.pieceNumber ?? piece.number,
+    distance: parsed.distance,
+    charge: parsed.charge,
+    tof: parsed.tof,
+    deflection: parsed.deflection,
+    qe: parsed.qe,
+  });
+
+  if (
+    row.pieceNumber === undefined &&
+    row.distance === undefined &&
+    row.charge === undefined &&
+    row.tof === undefined &&
+    row.deflection === undefined &&
+    row.qe === undefined
+  ) {
+    return null;
+  }
+
+  return {
+    id: `${Date.now()}-${piece.number}-${Math.random().toString(36).slice(2, 7)}`,
+    ...row,
+  };
+}
+
+function currentTargetFromDisplay(text: string): number | undefined {
+  const match = text.match(/\b(?:KNPT|BLANCO|TGT)\s*(?:\(P\s+\*\))?\s*:?\s*(\d+)/i);
+  return cleanNumber(match?.[1]);
+}
+
+function parseDirectionalNumber(value: string, positiveLetters: string, negativeLetters: string): number | undefined {
+  const clean = value.trim().toUpperCase();
+  if (!clean) return undefined;
+
+  const direction = clean[0];
+  const numeric = Number((positiveLetters + negativeLetters).includes(direction) ? clean.slice(1) : clean);
+  if (!Number.isFinite(numeric)) return undefined;
+
+  return negativeLetters.includes(direction) ? -numeric : numeric;
+}
+
+function getRecordInputField(text: string): Hp71RecordInputField | null {
+  if (/DIR\s+\(P\s+X\):/i.test(text)) return "observerDirection";
+  if (/\(L\/R\)\s+SHIFT/i.test(text)) return "correctionLR";
+  if (/\(A\/D\)\s+SHIFT/i.test(text)) return "correctionAD";
+  if (/\(U\/D\)\s+SHIFT/i.test(text)) return "correctionUD";
+  return null;
+}
+
+function definedRecordPatch(patch: Partial<Hp71RecordData>): Partial<Hp71RecordData> {
+  return Object.fromEntries(
+    Object.entries(patch).filter(([, value]) => value !== undefined)
+  ) as Partial<Hp71RecordData>;
+}
+
+function fmtRecord(value: number | undefined): string {
+  return value === undefined || value === 0 ? "" : String(Math.round(value * 10) / 10);
+}
+
+function RecordDeTiroDialog({
+  data,
+  rows,
+  onClose,
+}: {
+  data: Hp71RecordData;
+  rows: Hp71RecordRow[];
+  onClose: () => void;
+}) {
+  const valueBoxClass = "absolute -translate-x-1/2 translate-y-[36px] overflow-hidden whitespace-nowrap text-center font-mono text-[clamp(10px,1.05vw,17px)] font-black leading-none text-blue-600";
+  const rowValueBoxClass = "absolute -translate-x-1/2 translate-y-[36px] overflow-hidden whitespace-nowrap text-center font-mono text-[clamp(9px,0.95vw,15px)] font-black leading-none text-green-600";
+  const fields: Array<{ id: string; key: keyof Hp71RecordData; className: string }> = [
+    { id: "target", key: "targetNumber", className: "left-[53.3%] top-[6.4%] w-[8%]" },
+    { id: "piece", key: "pieceNumber", className: "left-[33%] top-[26.6%] w-[4.5%]" },
+    { id: "distance", key: "distance", className: "left-[52%] top-[26.6%] w-[9%]" },
+    { id: "charge", key: "charge", className: "left-[40%] top-[30%] w-[3.8%]" },
+    { id: "tof-initial", key: "tof", className: "left-[65.2%] top-[30%] w-[6.2%]" },
+    { id: "deflection", key: "deflection", className: "left-[76.5%] top-[30%] w-[7.5%]" },
+    { id: "qe", key: "qe", className: "left-[84%] top-[30%] w-[6.5%]" },
+    { id: "angle-t-message", key: "angleT", className: "left-[40.8%] top-[30%] w-[7.5%]" },
+    { id: "observer-direction", key: "observerDirection", className: "left-[6.7%] top-[43.5%] w-[6.5%]" },
+    { id: "correction-lr", key: "correctionLR", className: "left-[12.1%] top-[43.5%] w-[4.8%]" },
+    { id: "correction-ad", key: "correctionAD", className: "left-[16.1%] top-[43.5%] w-[4.8%]" },
+    { id: "correction-ud", key: "correctionUD", className: "left-[21.8%] top-[43.5%] w-[4.8%]" },
+  ];
+  const rowFields: Array<{ key: keyof Hp71RecordRow; left: string; width: string }> = [
+    { key: "targetNumber", left: "5%", width: "6.3%" },
+    { key: "pieceNumber", left: "6%", width: "4.5%" },
+    { key: "distance", left: "12.8%", width: "5.7%" },
+    { key: "charge", left: "24.7%", width: "3.6%" },
+    { key: "tof", left: "40%", width: "5.3%" },
+    { key: "deflection", left: "61.5%", width: "6.2%" },
+    { key: "qe", left: "79.5%", width: "5.6%" },
+  ];
+
+  return (
+    <div className="fixed inset-0 z-[2147483647] flex items-center justify-center bg-black/85 p-4">
+      <div className="relative h-[94vh] w-[98vw] overflow-hidden rounded-2xl border-2 border-[#F39C63] bg-white shadow-2xl">
+        <div className="absolute right-3 top-3 z-30 flex gap-2">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-full bg-black/80 p-2 text-white transition hover:bg-[#F39C63] hover:text-black"
+            aria-label="Cerrar record de tiro"
+          >
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+
+        <div className="relative flex h-full w-full items-start justify-center overflow-auto bg-white p-4 pt-12">
+          <div className="relative aspect-[792/612] w-[min(1500px,calc(100vw-64px))] min-w-[960px]">
+            <iframe
+              title="Record de tiro"
+              src="/record-de-tiro.html"
+              className="absolute inset-0 h-full w-full border-0"
+            />
+            <div className="pointer-events-none absolute inset-0 z-20">
+              {fields.map((field) => (
+                <span
+                  key={field.id}
+                  className={`${valueBoxClass} ${field.className}`}
+                  title={fmtRecord(data[field.key])}
+                >
+                  {fmtRecord(data[field.key])}
+                </span>
+              ))}
+              {rows.slice(0, 7).map((row, rowIndex) => (
+                <React.Fragment key={row.id}>
+                  {rowFields.map((field) => (
+                    <span
+                      key={`${row.id}-${field.key}`}
+                      className={rowValueBoxClass}
+                      style={{
+                        left: field.left,
+                        top: `${43.5 + rowIndex * 2.65}%`,
+                        width: field.width,
+                      }}
+                      title={fmtRecord(row[field.key] as number | undefined)}
+                    >
+                      {fmtRecord(row[field.key] as number | undefined)}
+                    </span>
+                  ))}
+                </React.Fragment>
+              ))}
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+  );
 }
 
 type HP71EmulatorProps = {
@@ -282,6 +550,13 @@ export default function HP71Emulator({
 
   // Estado para almacenar resultados manuales extraídos
   const [manualResults, setManualResults] = useState<{alcance: number, elevacion: number, tof: number}[]>([]);
+  const [missionCaptures, setMissionCaptures] = useState<MissionCapture[]>([]);
+  const [recordOpen, setRecordOpen] = useState(false);
+  const [recordData, setRecordData] = useState<Hp71RecordData>({});
+  const [recordRows, setRecordRows] = useState<Hp71RecordRow[]>([]);
+  const [recordInputField, setRecordInputField] = useState<Hp71RecordInputField | null>(null);
+  const lastVisibleCaptureRef = useRef<string>("");
+  const capturesRef = useRef<HTMLDivElement>(null);
 
   // Nuevos estados para pieza base
   const [basePieceNumber, setBasePieceNumber] = useState<number>(1);
@@ -317,17 +592,81 @@ export default function HP71Emulator({
     }
   }, [userName, logSessionId]);
 
+  const addMissionCapture = useCallback((piece: PieceResult) => {
+    const captureText = extractMissionResultCapture(piece);
+    if (!captureText) return;
+    const recordRow = parsePieceRecordRow(piece, recordData);
+
+    setMissionCaptures((prev) => [
+      {
+        id: `${Date.now()}-${piece.number}-${Math.random().toString(36).slice(2, 7)}`,
+        title: `Captura ${prev.length + 1}`,
+        text: captureText,
+        pinned: false,
+        createdAt: Date.now(),
+      },
+      ...prev,
+    ]);
+    if (recordRow) {
+      setRecordRows((prev) => [...prev, recordRow].slice(-7));
+    }
+  }, [recordData]);
+
+  const toggleMissionCapturePin = useCallback((id: string) => {
+    setMissionCaptures((prev) => prev.map((capture) => (
+      capture.id === id ? { ...capture, pinned: !capture.pinned } : capture
+    )));
+  }, []);
+
+  const deleteMissionCapture = useCallback((id: string) => {
+    lastVisibleCaptureRef.current = "";
+    setMissionCaptures((prev) => prev.filter((capture) => capture.id !== id));
+  }, []);
+
+  const refreshRecordData = useCallback(async () => {
+    const backendRecord = await fetchHp71Record();
+    if (backendRecord) {
+      setRecordData((prev) => ({ ...prev, ...backendRecord }));
+    }
+  }, []);
+
+  const openRecord = useCallback(() => {
+    setRecordOpen(true);
+    void refreshRecordData();
+  }, [refreshRecordData]);
+
   // ---------- Envío de comandos al servidor ----------
   const sendCommand = useCallback(async (command: string, preferredBasePieceNumber = basePieceNumber) => {
-    if (!command.trim() || loading) return;
+    if (loading) return;
     const pendingMapModelField = command !== "P" ? mapModelField : null;
     const pendingObserverField = command !== "P" ? observerField : null;
     const pendingPieceField = command !== "P" ? pieceField : null;
     const pendingTargetField = command !== "P" ? targetField : null;
+    const pendingRecordInputField = command !== "P" && command !== "*" ? recordInputField : null;
     setLoading(true);
     try {
       const responseText = await fetchHp71Display(command);
       let nextBasePieceNumber = preferredBasePieceNumber;
+      const recordInputPatch: Partial<Hp71RecordData> = {};
+
+      if (pendingRecordInputField) {
+        const cleanCommand = command.trim();
+        if (cleanCommand) {
+          if (pendingRecordInputField === "observerDirection") {
+            const value = Number(cleanCommand);
+            if (Number.isFinite(value)) recordInputPatch.observerDirection = value;
+          } else if (pendingRecordInputField === "correctionLR") {
+            const value = parseDirectionalNumber(cleanCommand, "R", "L");
+            if (value !== undefined) recordInputPatch.correctionLR = value;
+          } else if (pendingRecordInputField === "correctionAD") {
+            const value = parseDirectionalNumber(cleanCommand, "A", "D");
+            if (value !== undefined) recordInputPatch.correctionAD = value;
+          } else if (pendingRecordInputField === "correctionUD") {
+            const value = parseDirectionalNumber(cleanCommand, "U", "D");
+            if (value !== undefined) recordInputPatch.correctionUD = value;
+          }
+        }
+      }
 
       if (pendingMapModelField) {
         mapModelDraftRef.current = {
@@ -450,6 +789,15 @@ export default function HP71Emulator({
         setWaitingBasePiece(false);
       }
 
+      setRecordData((prev) => ({
+        ...prev,
+        targetNumber: currentTargetFromDisplay(responseText) ?? prev.targetNumber,
+        ...definedRecordPatch(parseRecordFromDisplay(responseText, nextBasePieceNumber)),
+        ...recordInputPatch,
+      }));
+      setRecordInputField(getRecordInputField(responseText));
+      void refreshRecordData();
+
       // ---------- Extraer QE, TOF y Alcance siempre que aparezcan ----------
       if (/DIST/i.test(responseText)) {
         const distMatch = responseText.match(/DIST\s+(\d+(?:\.\d+)?)/);
@@ -470,7 +818,8 @@ export default function HP71Emulator({
       if (foundPieces.length > 0) {
         setPieces(foundPieces);
         const selectedIndex = foundPieces.findIndex((piece) => piece.number === nextBasePieceNumber);
-        setPieceIndex(selectedIndex >= 0 ? selectedIndex : 0);
+        const nextIndex = selectedIndex >= 0 ? selectedIndex : 0;
+        setPieceIndex(nextIndex);
         setPieceMode(true);
         setPromptVisible(false);
       } else {
@@ -486,7 +835,7 @@ export default function HP71Emulator({
     } finally {
       setLoading(false);
     }
-  }, [basePieceNumber, loading, mapModelField, observerField, pieceField, targetField, onMapModelComplete, onObserverComplete, onPieceComplete, onTargetComplete]);
+  }, [basePieceNumber, loading, mapModelField, observerField, pieceField, targetField, recordInputField, onMapModelComplete, onObserverComplete, onPieceComplete, onTargetComplete, addMissionCapture, refreshRecordData]);
 
   // ---------- Manejo unificado de teclas ----------
   const handleKeyPress = useCallback(
@@ -502,6 +851,14 @@ export default function HP71Emulator({
       if (key === "DOWN") {
         logEvent('INPUT', 'USUARIO: ▼');
         setPieceIndex((prev) => Math.min(prev + 1, pieces.length - 1));
+        return;
+      }
+
+      if (pieceMode && key !== "BACK" && key !== " ") {
+        setBuffer("");
+        setPieceMode(false);
+        sendCommand(key.toUpperCase());
+        logEvent('INPUT', `USUARIO: ${key.toUpperCase()}`);
         return;
       }
 
@@ -521,8 +878,8 @@ export default function HP71Emulator({
       if (key === "ENTER") {
         const cmd = buffer.trim();
         if (cmd === "") {
-          sendCommand("MAIN");
-          logEvent('INPUT', 'USUARIO: MAIN');
+          sendCommand("");
+          logEvent('INPUT', 'USUARIO: ENTER');
           return;
         }
         let preferredBasePieceNumber = basePieceNumber;
@@ -544,6 +901,9 @@ export default function HP71Emulator({
         setPromptVisible(false);
         setPieceMode(false);
         setManualResults([]);
+        setRecordData({});
+        setRecordRows([]);
+        setRecordInputField(null);
         setBasePieceNumber(1);
         setWaitingBasePiece(false);
         setMapModelField(null);
@@ -573,13 +933,9 @@ export default function HP71Emulator({
       }
 
       // Tecla normal (se añade al buffer sin registrar)
-      if ((key === "P" || key === "Y" || key === "N") && pieces.length > 0) {
-        const selectedIndex = pieces.findIndex((piece) => piece.number === basePieceNumber);
-        setPieceIndex(selectedIndex >= 0 ? selectedIndex : 0);
-      }
       setBuffer((prev) => prev + key.toUpperCase());
     },
-    [buffer, sendCommand, pieces.length, pieces, logEvent, waitingBasePiece, basePieceNumber]
+    [buffer, sendCommand, pieceMode, logEvent, waitingBasePiece, basePieceNumber]
   );
 
   // ---------- Teclado físico ----------
@@ -610,6 +966,28 @@ export default function HP71Emulator({
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [handleKeyPress, isActive]);
 
+  useEffect(() => {
+    if (!pieceMode) {
+      lastVisibleCaptureRef.current = "";
+    }
+  }, [pieceMode]);
+
+  useEffect(() => {
+    if (!pieceMode || pieces.length === 0) return;
+    const selectedPiece = pieces[pieceIndex];
+    if (!selectedPiece) return;
+
+    const signature = `${selectedPiece.number}:${selectedPiece.text}`;
+    if (lastVisibleCaptureRef.current === signature) return;
+    lastVisibleCaptureRef.current = signature;
+    addMissionCapture(selectedPiece);
+  }, [pieceMode, pieceIndex, pieces, addMissionCapture]);
+
+  useEffect(() => {
+    if (missionCaptures.length === 0) return;
+    capturesRef.current?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+  }, [missionCaptures.length]);
+
   // ---------- Contenido del LCD ----------
   const lcdContent = pieceMode && pieces.length > 0
     ? pieces[pieceIndex]?.text ?? ""
@@ -617,10 +995,14 @@ export default function HP71Emulator({
     ? `${screenText}${buffer}`
     : screenText;
 
+  const isPieceDisplay = pieceMode && pieces.length > 0;
+  const lcdLines = isPieceDisplay
+    ? lcdContent.split(/\r?\n/).filter((line) => line.trim() !== "")
+    : [];
   const visibleLcdLines = getVisibleLcdLines(lcdContent, pieceMode);
 
   return (
-    <div className="h-full w-full bg-[#0d0d0f] text-gray-100 flex items-center justify-center p-4 sm:p-6 overflow-x-auto">
+    <div className="h-full w-full bg-[#0d0d0f] text-gray-100 flex items-start justify-center p-4 sm:p-6 overflow-auto">
       <style dangerouslySetInnerHTML={{__html: `
         @import url('https://fonts.googleapis.com/css2?family=WDXL+Lubrifont+JP+N:wght@400;700;900&display=swap');
 
@@ -637,18 +1019,27 @@ export default function HP71Emulator({
         }
       `}} />
 
-      <div className="flex flex-col items-center gap-2 max-w-full w-[1100px]">
-        <a
-          href={`/api/hp71/log?user=${encodeURIComponent(userName)}&sessionId=${encodeURIComponent(logSessionId)}`}
-          target="_blank"
-          className="h-10 px-6 rounded-xl border-2 border-[#F39C63] bg-[#0A0A0B]/60 text-[#F39C63] hover:bg-[#F39C63] hover:text-black transition-all flex items-center justify-center text-[11px] font-black uppercase tracking-[0.2em] shadow-2xl"
-        >
-          Historial
-        </a>
+      <div className="flex min-h-max flex-col items-center gap-4 max-w-full w-[1100px] pb-8">
+        <div className="flex flex-wrap items-center justify-center gap-3">
+          <a
+            href={`/api/hp71/log?user=${encodeURIComponent(userName)}&sessionId=${encodeURIComponent(logSessionId)}`}
+            target="_blank"
+            className="h-10 px-6 rounded-xl border-2 border-[#F39C63] bg-[#0A0A0B]/60 text-[#F39C63] hover:bg-[#F39C63] hover:text-black transition-all flex items-center justify-center text-[11px] font-black uppercase tracking-[0.2em] shadow-2xl"
+          >
+            Historial
+          </a>
+          <button
+            type="button"
+            onClick={openRecord}
+            className="h-10 px-6 rounded-xl border-2 border-[#F39C63] bg-[#0A0A0B]/60 text-[#F39C63] hover:bg-[#F39C63] hover:text-black transition-all flex items-center justify-center text-[11px] font-black uppercase tracking-[0.2em] shadow-2xl"
+          >
+            Record de tiro
+          </button>
+        </div>
 
       <div className="relative bg-[#6F6F6F] p-[10px] sm:p-[14px] rounded-[20px] shadow-[0_35px_80px_-15px_rgba(0,0,0,0.95)] border-[4px] border-[#101011] border-b-[12px] max-w-full w-full">
 
-        <div className="relative h-[175px] w-full select-none overflow-hidden">
+        <div className="relative w-full select-none h-[175px] overflow-hidden">
           <div
             className="absolute inset-0 bg-[#6F6F6F] rounded-t-[8px]"
             style={{ clipPath: "polygon(0 0, 100% 0, 100% 169px, 64% 169px, 64% 137px, 0 137px)" }}
@@ -666,7 +1057,7 @@ export default function HP71Emulator({
                 <div className="absolute inset-0 bg-gradient-to-b from-black/15 via-transparent to-black/5 pointer-events-none" />
 
                 <div className="relative w-full h-full px-4 py-2 flex flex-col justify-around overflow-hidden z-10">
-                  <div className="retro-lcd-font text-[#BAFF7C] text-[20px] sm:text-[25px] flex flex-col w-full h-full justify-around tracking-[0.08em] uppercase select-none leading-none">
+                  <div className="retro-lcd-font text-[#BAFF7C] text-[20px] sm:text-[25px] justify-around leading-none flex flex-col w-full h-full tracking-[0.08em] uppercase select-none">
                     <div className="opacity-85 overflow-hidden whitespace-nowrap">
                       {visibleLcdLines[0]}
                     </div>
@@ -743,6 +1134,49 @@ export default function HP71Emulator({
           </div>
         </div>
       </div>
+
+        {missionCaptures.length > 0 && (
+          <div ref={capturesRef} className="w-full max-w-full overflow-x-auto pb-2 pt-1">
+            <div className="flex min-w-max gap-5 px-2">
+              {missionCaptures.map((capture) => (
+                <div
+                  key={capture.id}
+                  className="w-[260px] min-h-[210px] rounded-xl border-2 border-[#F39C63] bg-[#0A0A0E] p-3 text-white shadow-[0_18px_45px_rgba(0,0,0,0.55)]"
+                >
+                  <div className="mb-3 flex items-center justify-between gap-3 text-[#F39C63]">
+                    <h3 className="text-sm font-black uppercase tracking-[0.08em]">{capture.title}</h3>
+                    <div className="flex items-center gap-2">
+                      <button
+                        type="button"
+                        title={capture.pinned ? "Quitar pin" : "Fijar captura"}
+                        onClick={() => toggleMissionCapturePin(capture.id)}
+                        className="text-[#F39C63] transition hover:text-[#85C5F1]"
+                      >
+                        {capture.pinned ? <PinOff className="h-4 w-4" /> : <Pin className="h-4 w-4" />}
+                      </button>
+                      <button
+                        type="button"
+                        title="Eliminar captura"
+                        onClick={() => deleteMissionCapture(capture.id)}
+                        className="text-[#F39C63] transition hover:text-[#FF7D73]"
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </button>
+                    </div>
+                  </div>
+                  <pre className="whitespace-pre-wrap font-mono text-[15px] font-bold leading-[1.15] text-white">{capture.text}</pre>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
+        {recordOpen && (
+          <RecordDeTiroDialog
+            data={recordData}
+            rows={recordRows}
+            onClose={() => setRecordOpen(false)}
+          />
+        )}
       </div>
     </div>
   );

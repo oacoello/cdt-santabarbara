@@ -105,6 +105,7 @@ export function ControlPanel({
   const [minN, setMinN] = useState('1567000');
   const [zona, setZona] = useState('16');
   const [esferoide, setEsferoide] = useState('1');
+  const canGenerateReport = Boolean(targetPosition && !isGeneratingReport);
 
   useEffect(() => {
     if (!mapModelInput) return;
@@ -246,7 +247,7 @@ export function ControlPanel({
     <div
       ref={panelRef}
       className={cn(
-        "w-full px-3 py-2"
+        "cdt-control-panel w-full px-3 py-2"
       )}
     >
       <Card className={cn(
@@ -254,17 +255,17 @@ export function ControlPanel({
         isDragged ? "pointer-events-auto" : "pointer-events-auto"
       )}>
 
-        <div className="p-3">
-          <div className="flex flex-col lg:flex-row items-stretch gap-3">
+        <div className="cdt-control-inner p-3">
+          <div className="cdt-control-sections flex flex-col lg:flex-row items-stretch gap-3">
 
             {/* ─── Configuración de Arma ─── */}
-            <div className="relative flex-none w-full lg:w-60 h-[18rem] rounded-[18px] border-2 border-[#F39C63] px-4 pb-4 pt-8 bg-[#0A0A0E]">
+            <div className="relative flex-none w-full lg:w-60 cdt-section-card h-[18rem] rounded-[18px] border-2 border-[#F39C63] px-4 pb-4 pt-8 bg-[#0A0A0E]">
               <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0A0A0E] px-5">
                 <h2 className="text-lg font-black uppercase tracking-wide text-foreground leading-none whitespace-nowrap">Arma</h2>
               </div>
-              <div className="space-y-2">
+              <div className="cdt-section-body space-y-2">
                 <div className="grid grid-cols-2 lg:grid-cols-1 gap-2">
-                  <div className="space-y-1">
+                  <div className="cdt-firing-body space-y-1">
                     <span className="text-[10px] uppercase font-bold text-[#F39C63] ml-1 tracking-wider">Sistema</span>
                     <Select
                       value={weapon}
@@ -308,11 +309,11 @@ export function ControlPanel({
             </div>
 
             {/* ─── Mapa Modelo ─── */}
-            <div className="relative flex-none w-full lg:w-72 h-[18rem] rounded-[18px] border-2 border-[#F39C63] px-5 pb-4 pt-8 bg-[#0A0A0E]">
+            <div className="relative flex-none w-full lg:w-72 cdt-section-card h-[18rem] rounded-[18px] border-2 border-[#F39C63] px-5 pb-4 pt-8 bg-[#0A0A0E]">
               <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0A0A0E] px-5">
                 <h2 className="text-lg font-black uppercase tracking-wide text-foreground leading-none whitespace-nowrap">Mapa modelo</h2>
               </div>
-              <div className="space-y-3">
+              <div className="cdt-map-model-body space-y-3">
                 <div className="grid grid-cols-2 gap-x-4 gap-y-3">
                   <div className="space-y-1">
                     <span className="text-[10px] uppercase font-bold text-muted-foreground ml-1 tracking-wider">MAX E</span>
@@ -384,7 +385,7 @@ export function ControlPanel({
             <Separator orientation="vertical" className="hidden h-32 my-auto bg-border" />
 
             {/* ─── Datos de Tiro ─── */}
-            <div className="relative flex-none w-full lg:w-64 xl:w-72 h-[18rem] rounded-[18px] border-2 border-[#F39C63] px-4 pb-4 pt-8 bg-[#0A0A0E]">
+            <div className="relative flex-none w-full lg:w-64 xl:w-72 cdt-section-card h-[18rem] rounded-[18px] border-2 border-[#F39C63] px-4 pb-4 pt-8 bg-[#0A0A0E]">
               <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0A0A0E] px-5">
                 <h2 className="text-lg font-black uppercase tracking-wide text-foreground leading-none whitespace-nowrap">Datos de tiro</h2>
               </div>
@@ -414,7 +415,7 @@ export function ControlPanel({
             <Separator orientation="vertical" className="hidden h-32 my-auto bg-border" />
 
             {/* ─── Ajustes Manuales ─── */}
-            <div className="relative flex-[1.35] min-w-[500px] h-[18rem] rounded-[18px] border-2 border-[#F39C63] px-5 pb-4 pt-8 bg-[#0A0A0E]">
+            <div className="relative flex-[1.35] min-w-[500px] cdt-section-card h-[18rem] rounded-[18px] border-2 border-[#F39C63] px-5 pb-4 pt-8 bg-[#0A0A0E]">
               <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0A0A0E] px-5">
                 <h2 className="text-lg font-black uppercase tracking-wide text-foreground leading-none whitespace-nowrap">Ajustes</h2>
               </div>
@@ -449,7 +450,7 @@ export function ControlPanel({
             <Separator orientation="vertical" className="hidden h-32 my-auto bg-border" />
 
             {/* ─── Acciones Finales ─── */}
-            <div className="relative flex-none min-w-[190px] h-[18rem] rounded-[18px] border-2 border-[#F39C63] px-4 pb-4 pt-8 bg-[#0A0A0E]">
+            <div className="relative flex-none min-w-[190px] cdt-section-card h-[18rem] rounded-[18px] border-2 border-[#F39C63] px-4 pb-4 pt-8 bg-[#0A0A0E]">
               <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0A0A0E] px-5">
                 <h2 className="text-lg font-black uppercase tracking-wide text-foreground leading-none whitespace-nowrap">Acciones</h2>
               </div>
@@ -473,10 +474,13 @@ export function ControlPanel({
                 <Button
                   variant="outline"
                   onClick={onReport}
-                  disabled={!targetPosition || isGeneratingReport}
+                  disabled={!canGenerateReport}
                   className="w-40 border-2 border-[#85C5F1] bg-transparent text-[#85C5F1] hover:bg-[#85C5F1]/10 rounded-xl font-black uppercase tracking-wide gap-2 h-12 text-[11px] leading-none transition-colors"
                 >
-                  <span className="material-symbols-outlined text-xl leading-none text-[#85C5F1]">assignment</span>
+                  <span className={cn(
+                    "material-symbols-outlined text-xl leading-none transition-colors",
+                    canGenerateReport ? "text-[#85C5F1]" : "text-[#425F75]",
+                  )}>assignment</span>
                   <span className="leading-none whitespace-pre-line">
                     {isGeneratingReport ? 'COMPILANDO...' : 'GENERAR\nREPORTE'}
                   </span>
@@ -567,9 +571,9 @@ function FiringMetric({
   className: string;
 }) {
   return (
-    <div className="flex items-baseline justify-between border-b border-[#22313B] py-1 last:border-b-0">
-      <span className={cn("text-xl font-black uppercase", className)}>{label}</span>
-      <span className={cn("text-3xl font-black tracking-tight", className)}>
+    <div className="cdt-firing-metric flex items-baseline justify-between border-b border-[#22313B] py-1 last:border-b-0">
+      <span className={cn("cdt-firing-label text-xl font-black uppercase", className)}>{label}</span>
+      <span className={cn("cdt-firing-value text-3xl font-black tracking-tight", className)}>
         {value}
         <span className="ml-2 text-2xl lowercase">{unit}</span>
       </span>
@@ -593,7 +597,7 @@ function CoordinatePlacementRow({
   onClear: () => void;
 }) {
   return (
-    <div className="grid grid-cols-[88px_repeat(3,minmax(92px,1fr))_124px_48px] items-end gap-2 border-b border-border/70 pb-2 last:border-b-0 last:pb-0">
+    <div className="cdt-coordinate-row grid grid-cols-[88px_repeat(3,minmax(92px,1fr))_124px_48px] items-end gap-2 border-b border-border/70 pb-2 last:border-b-0 last:pb-0">
       <div className="pb-2 text-[11px] font-black uppercase tracking-wider text-foreground">
         {label}
       </div>
@@ -633,7 +637,7 @@ function CoordinateField({
         inputMode="numeric"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="w-full bg-background border border-border h-8 text-sm font-mono font-black rounded-xl hover:bg-secondary transition-colors px-3 text-[#F39C63]"
+        className="cdt-coordinate-input w-full bg-background border border-border h-8 text-sm font-mono font-black rounded-xl hover:bg-secondary transition-colors px-3 text-[#F39C63]"
       />
     </label>
   );

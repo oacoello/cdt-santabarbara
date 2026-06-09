@@ -15,6 +15,7 @@ class BasicEngine
 {
 public:
     std::string execute(const std::string& cmd);
+    std::string recordDataJson();
     std::string resetData();
 private:
 
