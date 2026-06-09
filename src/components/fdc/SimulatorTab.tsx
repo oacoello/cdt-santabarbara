@@ -191,8 +191,8 @@ export function SimulatorTab({
   }, [gunPosition, mapCenter, isGunLocated]);
 
   return (
-    <div className="h-full w-full min-h-0 flex flex-col">
-      <div className="flex-1 min-h-0 relative overflow-hidden p-3">
+    <div className="cdt-simulator-tab h-full w-full min-h-0 flex flex-col">
+      <div className="cdt-map-stage flex-1 min-h-0 relative overflow-hidden p-3">
         <div className="absolute inset-0 z-0">
           <TacticalMap
             gunPosition={gunPosition}
@@ -216,9 +216,9 @@ export function SimulatorTab({
         <div className="absolute inset-y-0 left-0 z-10 w-[24rem] pointer-events-none bg-gradient-to-r from-[#0A0A0B]/95 via-[#0A0A0B]/70 to-transparent" />
         <div className="absolute inset-y-0 right-0 z-10 w-[24rem] pointer-events-none bg-gradient-to-l from-[#0A0A0B]/95 via-[#0A0A0B]/70 to-transparent" />
 
-        <div className="relative z-20 h-full min-h-0 grid grid-cols-[minmax(15rem,18rem)_minmax(20rem,1fr)_minmax(15rem,18rem)] gap-3 pointer-events-none">
+        <div className="cdt-map-overlay relative z-20 h-full min-h-0 grid grid-cols-[minmax(15rem,18rem)_minmax(20rem,1fr)_minmax(15rem,18rem)] gap-3 pointer-events-none">
         {/* Panel Izquierdo: Localización */}
-        <div className="h-full min-h-0 flex flex-col gap-3 pointer-events-auto">
+        <div className="cdt-side-panel h-full min-h-0 flex flex-col gap-3 pointer-events-auto">
           <div className="bg-[#0A0A0B] p-5 rounded-[20px] border-2 border-[#F39C63] shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2 text-[#F39C63]">
@@ -296,14 +296,14 @@ export function SimulatorTab({
         </div>
 
         {/* Panel Derecho */}
-        <div className="h-full min-h-0 flex flex-col gap-3 pointer-events-auto">
+        <div className="cdt-side-panel h-full min-h-0 flex flex-col gap-3 pointer-events-auto">
           <MeteorologyPanel position={gunPosition || mapCenter} />
           <AdvancedObserver otLine={otLine} setOtLine={setOtLine} onCorrection={(lr, ad) => handleAOCorrection(otLine, lr, ad)} />
         </div>
         </div>
       </div>
 
-      <div className="flex-none border-t-2 border-[#F39C63] bg-black/20 backdrop-blur-md">
+      <div className="cdt-control-dock flex-none border-t-2 border-[#F39C63] bg-black/20 backdrop-blur-md">
         <ControlPanel
           gunPosition={gunPosition} targetPosition={targetPosition} isGunLocated={isGunLocated}
           weapon={weapon} charge={charge} corrections={corrections} setWeapon={setWeapon} setCharge={setCharge}

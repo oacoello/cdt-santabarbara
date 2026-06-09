@@ -11,11 +11,86 @@ import 'maplibre-gl/dist/maplibre-gl.css';
 
 const MAPTILER_KEY = 'VRmMIQ93urJL9gK2BcI1'; 
 const MAP_STYLE = `https://api.maptiler.com/maps/outdoor-v2-dark/style.json?key=${MAPTILER_KEY}`;
+const TERRAIN_SOURCE_ID = 'terrain-dem';
+const TERRAIN_TILEJSON = `https://api.maptiler.com/tiles/terrain-rgb-v2/tiles.json?key=${MAPTILER_KEY}`;
 
 const UTM_GRID_ZONE = 16;
 const UTM_GRID_BAND = 'P';
-const UTM_GRID_LABEL = `${UTM_GRID_ZONE}${UTM_GRID_BAND}`;
+const POV_FOV_DEGREES = 120;
+const EMPTY_FEATURE_COLLECTION = { type: 'FeatureCollection', features: [] } as GeoJSON.FeatureCollection;
 
+
+
+const getBearingBetween = (from: LatLng, to: LatLng) => {
+  const fromLat = from.lat * Math.PI / 180;
+  const toLat = to.lat * Math.PI / 180;
+  const deltaLng = (to.lng - from.lng) * Math.PI / 180;
+  const y = Math.sin(deltaLng) * Math.cos(toLat);
+  const x = Math.cos(fromLat) * Math.sin(toLat) - Math.sin(fromLat) * Math.cos(toLat) * Math.cos(deltaLng);
+  return (Math.atan2(y, x) * 180 / Math.PI + 360) % 360;
+};
+
+
+
+const getDistanceMeters = (from: LatLng, to: LatLng) => {
+  const earthRadius = 6371e3;
+  const fromLat = from.lat * Math.PI / 180;
+  const toLat = to.lat * Math.PI / 180;
+  const deltaLat = (to.lat - from.lat) * Math.PI / 180;
+  const deltaLng = (to.lng - from.lng) * Math.PI / 180;
+  const a = Math.sin(deltaLat / 2) ** 2
+    + Math.cos(fromLat) * Math.cos(toLat) * Math.sin(deltaLng / 2) ** 2;
+  return earthRadius * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+};
+
+const getDestinationPoint = (origin: LatLng, bearing: number, distanceMeters: number): LatLng => {
+  const earthRadius = 6371e3;
+  const angularDistance = distanceMeters / earthRadius;
+  const bearingRad = bearing * Math.PI / 180;
+  const lat1 = origin.lat * Math.PI / 180;
+  const lng1 = origin.lng * Math.PI / 180;
+
+  const lat2 = Math.asin(
+    Math.sin(lat1) * Math.cos(angularDistance)
+    + Math.cos(lat1) * Math.sin(angularDistance) * Math.cos(bearingRad),
+  );
+  const lng2 = lng1 + Math.atan2(
+    Math.sin(bearingRad) * Math.sin(angularDistance) * Math.cos(lat1),
+    Math.cos(angularDistance) - Math.sin(lat1) * Math.sin(lat2),
+  );
+
+  return { lat: lat2 * 180 / Math.PI, lng: lng2 * 180 / Math.PI };
+};
+
+const buildPovFovLines = (origin: LatLng, target: LatLng) => {
+  const centerBearing = getBearingBetween(origin, target);
+  const radius = Math.max(getDistanceMeters(origin, target) * 1.25, 1000);
+  const halfAngle = POV_FOV_DEGREES / 2;
+  const left = getDestinationPoint(origin, centerBearing - halfAngle, radius);
+  const right = getDestinationPoint(origin, centerBearing + halfAngle, radius);
+  const center = getDestinationPoint(origin, centerBearing, radius);
+
+  return {
+    type: 'FeatureCollection',
+    features: [
+      {
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: [[origin.lng, origin.lat], [left.lng, left.lat]] },
+        properties: { kind: 'left', angle: `${POV_FOV_DEGREES}°`, bearing: Math.round(centerBearing - halfAngle) },
+      },
+      {
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: [[origin.lng, origin.lat], [right.lng, right.lat]] },
+        properties: { kind: 'right', angle: `${POV_FOV_DEGREES}°`, bearing: Math.round(centerBearing + halfAngle) },
+      },
+      {
+        type: 'Feature',
+        geometry: { type: 'LineString', coordinates: [[origin.lng, origin.lat], [center.lng, center.lat]] },
+        properties: { kind: 'center', angle: 'CENTER', bearing: Math.round(centerBearing) },
+      },
+    ],
+  } as GeoJSON.FeatureCollection<GeoJSON.LineString>;
+};
 const shouldHideNonSettlementLabel = (layer: maplibregl.LayerSpecification) => {
   if (layer.type !== 'symbol') return false;
 
@@ -83,7 +158,6 @@ const buildUtmGridData = (bounds: maplibregl.LngLatBounds, zoom: number) => {
 
   const lineFeatures: GeoJSON.Feature<GeoJSON.LineString>[] = [];
   const labelFeatures: GeoJSON.Feature<GeoJSON.Point>[] = [];
-  const quadrantFeatures: GeoJSON.Feature<GeoJSON.Point>[] = [];
 
   for (let easting = minE; easting <= maxE; easting += step) {
     const coordinates: [number, number][] = [];
@@ -123,21 +197,10 @@ const buildUtmGridData = (bounds: maplibregl.LngLatBounds, zoom: number) => {
     });
   }
 
-  for (let easting = minE; easting < maxE; easting += step) {
-    for (let northing = minN; northing < maxN; northing += step) {
-      const center = utmToLatLon(easting + step / 2, northing + step / 2, UTM_GRID_ZONE, UTM_GRID_BAND);
-      quadrantFeatures.push({
-        type: 'Feature',
-        geometry: { type: 'Point', coordinates: [center.longitude, center.latitude] },
-        properties: { label: UTM_GRID_LABEL },
-      });
-    }
-  }
 
   return {
     lines: { type: 'FeatureCollection', features: lineFeatures } as GeoJSON.FeatureCollection<GeoJSON.LineString>,
     labels: { type: 'FeatureCollection', features: labelFeatures } as GeoJSON.FeatureCollection<GeoJSON.Point>,
-    quadrants: { type: 'FeatureCollection', features: quadrantFeatures } as GeoJSON.FeatureCollection<GeoJSON.Point>,
   };
 };
 
@@ -216,6 +279,67 @@ export function TacticalMapMapcn({
   const [mapBearing, setMapBearing] = useState(0);
   const [mapPitch, setMapPitch] = useState(65);
   const [isLocating, setIsLocating] = useState(false);
+  const [mapError, setMapError] = useState<string | null>(null);
+  const [activePerspective, setActivePerspective] = useState<'piece' | 'observer' | null>(null);
+
+  const enableTerrainPerspective = () => {
+    const mapInstance = map.current;
+    if (!mapInstance || !mapInstance.isStyleLoaded()) return;
+
+    if (!mapInstance.getSource(TERRAIN_SOURCE_ID)) {
+      mapInstance.addSource(TERRAIN_SOURCE_ID, {
+        type: 'raster-dem',
+        url: TERRAIN_TILEJSON,
+        tileSize: 256,
+      });
+    }
+
+    mapInstance.setTerrain({ source: TERRAIN_SOURCE_ID, exaggeration: 2.2 });
+  };
+
+  const enterPerspective = (origin: LatLng, fallbackBearing = mapBearing) => {
+    const mapInstance = map.current;
+    if (!mapInstance) return;
+
+    enableTerrainPerspective();
+    mapInstance.easeTo({
+      center: [origin.lng, origin.lat],
+      zoom: Math.max(mapInstance.getZoom(), 17.2),
+      pitch: 89,
+      bearing: fallbackBearing,
+      duration: 1000,
+    });
+    onCenterChange?.(origin);
+  };
+
+  const enterGunPerspective = () => {
+    if (!gunPosition) return;
+    if (!targetPosition) return;
+    setActivePerspective('piece');
+    enterPerspective(gunPosition, getBearingBetween(gunPosition, targetPosition));
+  };
+
+  const enterObserverPerspective = () => {
+    if (!observerPosition) return;
+    if (!targetPosition) return;
+    setActivePerspective('observer');
+    enterPerspective(observerPosition, getBearingBetween(observerPosition, targetPosition));
+  };
+
+  const leavePerspective = () => {
+    const mapInstance = map.current;
+    if (!mapInstance) return;
+
+    setActivePerspective(null);
+    mapInstance.setTerrain(null);
+    mapInstance.easeTo({
+      center: [mapCenter.lng, mapCenter.lat],
+      zoom: Math.min(mapInstance.getZoom(), 14),
+      pitch: 0,
+      bearing: 0,
+      duration: 900,
+    });
+  };
 
   const requestUserLocation = () => {
     if (typeof window === 'undefined' || !navigator.geolocation) {
@@ -256,14 +380,28 @@ export function TacticalMapMapcn({
   useEffect(() => {
     if (!mapContainer.current || map.current) return;
 
-    map.current = new maplibregl.Map({
-      container: mapContainer.current,
-      style: MAP_STYLE,
-      center: [mapCenter.lng, mapCenter.lat],
-      zoom: 14,
-      pitch: 65, // InclinaciÃ³n fuerte para ver el arco volar
-      bearing: 0,
-      attributionControl: false,
+    try {
+      map.current = new maplibregl.Map({
+        container: mapContainer.current,
+        style: MAP_STYLE,
+        center: [mapCenter.lng, mapCenter.lat],
+        zoom: 14,
+        pitch: 65, // Inclinación fuerte para ver el arco volar
+        bearing: 0,
+        maxPitch: 89,
+        attributionControl: false,
+      });
+    } catch (error) {
+      console.error('No se pudo inicializar el mapa táctico.', error);
+      setMapError('El entorno gráfico no pudo inicializar WebGL para el mapa táctico.');
+      return;
+    }
+
+    map.current.on('error', (event) => {
+      console.error('Error del mapa táctico.', event.error);
+      if (String(event.error?.message ?? '').toLowerCase().includes('webgl')) {
+        setMapError('El entorno gráfico no pudo inicializar WebGL para el mapa táctico.');
+      }
     });
 
     const syncMapOrientation = () => {
@@ -295,6 +433,48 @@ export function TacticalMapMapcn({
           'line-color': '#F39C63',
           'line-width': 4,
           'line-opacity': 0.9
+        }
+      });
+
+      map.current.addSource('pov-fov-lines', {
+        type: 'geojson',
+        data: EMPTY_FEATURE_COLLECTION
+      });
+
+      map.current.addLayer({
+        id: 'pov-fov-boundary-glow',
+        type: 'line',
+        source: 'pov-fov-lines',
+        filter: ['!=', ['get', 'kind'], 'center'],
+        paint: {
+          'line-color': '#ff5a1f',
+          'line-width': 10,
+          'line-opacity': 0.22,
+        }
+      });
+
+      map.current.addLayer({
+        id: 'pov-fov-boundary-lines',
+        type: 'line',
+        source: 'pov-fov-lines',
+        filter: ['!=', ['get', 'kind'], 'center'],
+        paint: {
+          'line-color': '#ff5a1f',
+          'line-width': 5,
+          'line-opacity': 1,
+        }
+      });
+
+      map.current.addLayer({
+        id: 'pov-fov-center-line',
+        type: 'line',
+        source: 'pov-fov-lines',
+        filter: ['==', ['get', 'kind'], 'center'],
+        paint: {
+          'line-color': '#85C5F1',
+          'line-width': 3,
+          'line-opacity': 0.95,
+          'line-dasharray': [1.2, 1.2],
         }
       });
 
@@ -340,40 +520,14 @@ export function TacticalMapMapcn({
 
 
 
-      map.current.addSource('utm-grid-quadrants', {
-        type: 'geojson',
-        data: { type: 'FeatureCollection', features: [] }
-      });
-
-      map.current.addLayer({
-        id: 'utm-grid-quadrants',
-        type: 'symbol',
-        source: 'utm-grid-quadrants',
-        layout: {
-          'text-field': ['get', 'label'],
-          'text-size': 15,
-          'text-anchor': 'center',
-          'text-allow-overlap': true,
-          'text-ignore-placement': true
-        },
-        paint: {
-          'text-color': '#D8DEE9',
-          'text-halo-color': '#0A0A0E',
-          'text-halo-width': 2,
-          'text-opacity': 0.35
-        }
-      });
-
       const updateUtmGrid = () => {
         if (!map.current) return;
         const lines = map.current.getSource('utm-grid-lines') as maplibregl.GeoJSONSource | undefined;
         const labels = map.current.getSource('utm-grid-labels') as maplibregl.GeoJSONSource | undefined;
-        const quadrants = map.current.getSource('utm-grid-quadrants') as maplibregl.GeoJSONSource | undefined;
-        if (!lines || !labels || !quadrants) return;
+        if (!lines || !labels) return;
         const grid = buildUtmGridData(map.current.getBounds(), map.current.getZoom());
         lines.setData(grid.lines);
         labels.setData(grid.labels);
-        quadrants.setData(grid.quadrants);
       };
 
       updateUtmGrid();
@@ -392,7 +546,10 @@ export function TacticalMapMapcn({
       }
     });
 
-    return () => { map.current?.remove(); map.current = null; };
+    return () => {
+      map.current?.remove();
+      map.current = null;
+    };
   }, []);
 
   useEffect(() => {
@@ -400,6 +557,20 @@ export function TacticalMapMapcn({
       map.current.flyTo({ center: [mapCenter.lng, mapCenter.lat], duration: 1000 });
     }
   }, [mapCenter]);
+
+  useEffect(() => {
+    if (!map.current || !map.current.isStyleLoaded()) return;
+    const source = map.current.getSource('pov-fov-lines') as maplibregl.GeoJSONSource | undefined;
+    if (!source) return;
+
+    const origin = activePerspective === 'piece' ? gunPosition : activePerspective === 'observer' ? observerPosition : null;
+    if (!origin || !targetPosition) {
+      source.setData(EMPTY_FEATURE_COLLECTION);
+      return;
+    }
+
+    source.setData(buildPovFovLines(origin, targetPosition));
+  }, [activePerspective, gunPosition, observerPosition, targetPosition]);
 
   // ActualizaciÃ³n de Trayectoria con elevaciÃ³n Z
   useEffect(() => {
@@ -519,6 +690,19 @@ export function TacticalMapMapcn({
   return (
     <div className="relative w-full h-full rounded-2xl overflow-hidden border-2 border-[#F39C63] shadow-2xl">
       <div ref={mapContainer} className="w-full h-full bg-[#0A0A0B]" />
+      {mapError && (
+        <div className="absolute inset-0 z-[900] flex items-center justify-center bg-[#0A0A0B] p-8 text-center">
+          <div className="max-w-lg rounded-2xl border border-[#F39C63]/50 bg-black/70 p-6 shadow-2xl">
+            <p className="text-xs font-black uppercase tracking-[0.25em] text-[#F39C63]">
+              Mapa táctico no disponible
+            </p>
+            <p className="mt-4 text-sm leading-6 text-white/75">
+              {mapError} El simulador y la calculadora siguen operativos. En WSL o máquinas sin aceleración gráfica,
+              ejecutá la app en Linux con soporte WebGL/mesa o probala en una instalación Linux real.
+            </p>
+          </div>
+        </div>
+      )}
       <button
         type="button"
         title="Restablecer norte e inclinación"
@@ -554,6 +738,37 @@ export function TacticalMapMapcn({
           <span>{Math.round(mapPitch)}°</span>
         </div>
       </button>
+      {activePerspective && targetPosition && (
+        <div className="absolute bottom-20 left-1/2 z-[1000] -translate-x-1/2 rounded-xl border border-[#ff5a1f]/50 bg-[#0A0A0E]/80 px-3 py-1.5 text-[10px] font-black uppercase tracking-[0.16em] text-[#ff8a4c] shadow-2xl backdrop-blur-md">
+          POV {POV_FOV_DEGREES}° hacia objetivo
+        </div>
+      )}
+      <div className="absolute bottom-5 left-1/2 z-[1000] flex -translate-x-1/2 items-center gap-2 rounded-2xl border border-slate-300/15 bg-[#0A0A0E]/75 p-2 shadow-2xl backdrop-blur-md">
+        <Button
+          size="sm"
+          disabled={!gunPosition || !targetPosition}
+          className="h-9 rounded-xl border border-[#85C5F1]/40 bg-[#85C5F1] px-4 text-[10px] font-black uppercase tracking-[0.12em] text-[#0A0A0E] hover:bg-[#85C5F1]/90 disabled:opacity-35"
+          onClick={enterGunPerspective}
+        >
+          Vista Pieza
+        </Button>
+        <Button
+          size="sm"
+          disabled={!observerPosition || !targetPosition}
+          className="h-9 rounded-xl border border-slate-300/30 bg-slate-300 px-4 text-[10px] font-black uppercase tracking-[0.12em] text-[#0A0A0E] hover:bg-slate-200 disabled:opacity-35"
+          onClick={enterObserverPerspective}
+        >
+          Vista Observador
+        </Button>
+        <Button
+          size="sm"
+          variant="outline"
+          className="h-9 rounded-xl border-[#F39C63]/60 bg-[#0A0A0E]/80 px-4 text-[10px] font-black uppercase tracking-[0.12em] text-[#F39C63] hover:bg-[#F39C63]/10"
+          onClick={leavePerspective}
+        >
+          Dejar perspectiva
+        </Button>
+      </div>
       <div className="absolute top-4 right-4 z-[1000]">
         <Button
           size="icon"

@@ -250,6 +250,10 @@ export interface MetData {
   windSpeed: number;
   windDirMils: number;
   elevation: number;
+  source?: string;
+  observedAt?: string;
+  latitude?: number;
+  longitude?: number;
 }
 
 export interface TelemetryData {
@@ -264,13 +268,45 @@ export interface TelemetryData {
   humidity: number;
 }
 
-export function getTacticalMet(position: LatLng): MetData {
+export async function getTacticalMet(position: LatLng): Promise<MetData> {
+  const params = new URLSearchParams({
+    latitude: String(position.lat),
+    longitude: String(position.lng),
+    current: [
+      'temperature_2m',
+      'relative_humidity_2m',
+      'surface_pressure',
+      'wind_speed_10m',
+      'wind_direction_10m',
+    ].join(','),
+    wind_speed_unit: 'ms',
+    timezone: 'auto',
+    forecast_days: '1',
+  });
+
+  const response = await fetch(`https://api.open-meteo.com/v1/forecast?${params.toString()}`);
+
+  if (!response.ok) {
+    throw new Error(`Open-Meteo ${response.status}`);
+  }
+
+  const data = await response.json();
+  const current = data.current;
+
+  if (!current) {
+    throw new Error('Open-Meteo sin datos actuales');
+  }
+
   return {
-    temp: 28 + Math.random() * 2,
-    pressure: 1012 - (Math.random() * 4),
-    humidity: 70,
-    windSpeed: 8,
-    windDirMils: 1200, // MILs
-    elevation: 150 + Math.random() * 200
+    temp: Number(current.temperature_2m),
+    pressure: Number(current.surface_pressure),
+    humidity: Number(current.relative_humidity_2m),
+    windSpeed: Number(current.wind_speed_10m),
+    windDirMils: Math.round((Number(current.wind_direction_10m) * 6400) / 360),
+    elevation: Number(data.elevation ?? 0),
+    source: 'Open-Meteo',
+    observedAt: current.time,
+    latitude: position.lat,
+    longitude: position.lng,
   };
 }

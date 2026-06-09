@@ -14,6 +14,10 @@ const SPLASH_FALLBACK_MS = 3500;
 const SPLASH_MAX_MS = 15000;
 const SPLASH_TERMINAL_FRAME_DELAY_MS = 10000;
 
+app.commandLine.appendSwitch('ignore-gpu-blocklist');
+app.commandLine.appendSwitch('enable-unsafe-swiftshader');
+app.commandLine.appendSwitch('enable-webgl');
+
 let nextProcess;
 let hp71Process;
 let geolocationPermission;
