@@ -2,15 +2,16 @@
 
 import React, { useEffect, useState } from 'react';
 import { Card } from "@/components/ui/card";
-import { Cloud, Wind, Thermometer, Droplets, Gauge, RefreshCw } from 'lucide-react';
+import { Cloud, Wind, Thermometer, Droplets, Gauge, RefreshCw, Minus } from 'lucide-react';
 import { type MetData, getTacticalMet, type LatLng } from '@/lib/ballistics';
 import { Button } from '@/components/ui/button';
 
 interface MeteorologyPanelProps {
   position: LatLng;
+  onCollapse?: () => void;
 }
 
-export function MeteorologyPanel({ position }: MeteorologyPanelProps) {
+export function MeteorologyPanel({ position, onCollapse }: MeteorologyPanelProps) {
   const [met, setMet] = useState<MetData | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -67,15 +68,28 @@ export function MeteorologyPanel({ position }: MeteorologyPanelProps) {
           <Cloud className="w-3 h-3 text-[#F39C63]" />
           <h3 className="text-xs font-black uppercase tracking-widest text-[#F39C63]">Meteorología Táctica</h3>
         </div>
-        <Button
-          variant="ghost"
-          size="icon"
-          onClick={updateMet}
-          className="h-7 w-7 text-[#F39C63]/60 hover:text-[#F39C63] transition-colors"
-          disabled={loading}
-        >
-          <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
-        </Button>
+        <div className="flex items-center gap-1">
+          <Button
+            variant="ghost"
+            size="icon"
+            onClick={updateMet}
+            className="h-7 w-7 text-[#F39C63]/60 hover:text-[#F39C63] transition-colors"
+            disabled={loading}
+          >
+            <RefreshCw className={`w-3 h-3 ${loading ? 'animate-spin' : ''}`} />
+          </Button>
+          {onCollapse && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onCollapse}
+              className="h-7 w-7 text-[#F39C63]/60 hover:text-[#F39C63] transition-colors"
+              title="Retraer meteorología"
+            >
+              <Minus className="w-3 h-3" />
+            </Button>
+          )}
+        </div>
       </div>
 
       {!met ? (

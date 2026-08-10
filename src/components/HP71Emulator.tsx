@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect, useCallback, useRef } from "react";
 import { Pin, PinOff, Trash2, X } from "lucide-react";
+import { getTacticalMet, type LatLng } from "@/lib/ballistics";
 
 // ---------- Funciones auxiliares ----------
 function extractBasePiece(text: string): number | null {
@@ -359,6 +360,53 @@ function fmtRecord(value: number | undefined): string {
   return value === undefined || value === 0 ? "" : String(Math.round(value * 10) / 10);
 }
 
+function clamp(value: number, min: number, max: number): number {
+  return Math.min(max, Math.max(min, value));
+}
+
+function qeMilsToDegrees(qe: number): number {
+  return clamp((qe * 360) / 6400, 5, 85);
+}
+
+function formatCsvNumber(value: number): string {
+  const normalized = Object.is(value, -0) || Math.abs(value) < 0.00005 ? 0 : value;
+  return Number.isInteger(normalized) ? String(normalized) : normalized.toFixed(4).replace(/0+$/g, "").replace(/\.$/g, "");
+}
+
+function getCatrachasChargeIndex(charge?: number): number {
+  if (charge === undefined) return 0;
+
+  const militaryCharge = Math.round(charge);
+  const chargeIndexByMilitaryCharge: Record<number, number> = {
+    1: 0, // GB M3A1
+    3: 1, // WB M4A2
+    5: 2, // WB M119A2
+    8: 3, // RB M203
+  };
+
+  return chargeIndexByMilitaryCharge[militaryCharge] ?? 0;
+}
+
+function getWindComponentsMps(windSpeed: number, windDirMils: number): { x: number; z: number } {
+  const radians = (windDirMils * 2 * Math.PI) / 6400;
+  return {
+    x: windSpeed * Math.sin(radians),
+    z: windSpeed * Math.cos(radians),
+  };
+}
+
+function downloadTextFile(filename: string, content: string, mimeType: string): void {
+  const blob = new Blob([content], { type: mimeType });
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = filename;
+  document.body.appendChild(link);
+  link.click();
+  link.remove();
+  URL.revokeObjectURL(url);
+}
+
 function RecordDeTiroDialog({
   data,
   rows,
@@ -454,6 +502,7 @@ function RecordDeTiroDialog({
 type HP71EmulatorProps = {
   userName?: string;
   logSessionId?: string;
+  metPosition?: LatLng;
   onMapModelComplete?: (model: {
     maxE: number;
     minE: number;
@@ -477,6 +526,7 @@ type HP71EmulatorProps = {
     e: number;
     n: number;
   }) => void;
+  onManualCalculationComplete?: (result: { alcance: number; elevacion: number; tof: number; rawOutput: string }) => void;
   isActive?: boolean;
 };
 
@@ -532,10 +582,12 @@ function getTargetPromptField(text: string): TargetField | null {
 export default function HP71Emulator({
   userName = "sin-perfil",
   logSessionId = "session",
+  metPosition,
   onMapModelComplete,
   onObserverComplete,
   onPieceComplete,
   onTargetComplete,
+  onManualCalculationComplete,
   isActive = true,
 }: HP71EmulatorProps) {
   const [screenText, setScreenText] = useState("SANTA BARBARA");
@@ -555,6 +607,7 @@ export default function HP71Emulator({
   const [recordData, setRecordData] = useState<Hp71RecordData>({});
   const [recordRows, setRecordRows] = useState<Hp71RecordRow[]>([]);
   const [recordInputField, setRecordInputField] = useState<Hp71RecordInputField | null>(null);
+  const [exportingCsv, setExportingCsv] = useState(false);
   const lastVisibleCaptureRef = useRef<string>("");
   const capturesRef = useRef<HTMLDivElement>(null);
 
@@ -633,7 +686,45 @@ export default function HP71Emulator({
   const openRecord = useCallback(() => {
     setRecordOpen(true);
     void refreshRecordData();
-  }, [refreshRecordData]);
+  }, [refreshRecordData, onManualCalculationComplete]);
+
+  const exportExerciseCsv = useCallback(async () => {
+    const latestRow = recordRows[recordRows.length - 1];
+    const source = latestRow ?? recordData;
+    const qe = source.qe;
+
+    if (qe === undefined || qe === 0) {
+      window.alert("No hay QE de HP71 disponible para exportar.");
+      return;
+    }
+
+    setExportingCsv(true);
+    try {
+      const met = metPosition ? await getTacticalMet(metPosition) : null;
+      const wind = met ? getWindComponentsMps(met.windSpeed, met.windDirMils) : { x: 0, z: 0 };
+      const chargeIndex = getCatrachasChargeIndex(source.charge);
+      const elevationDeg = qeMilsToDegrees(qe);
+
+      const csv = [
+        1,
+        155,
+        "HE_M106",
+        "catrachas",
+        chargeIndex,
+        formatCsvNumber(elevationDeg),
+        formatCsvNumber(wind.x),
+        formatCsvNumber(wind.z),
+      ].join(",");
+
+      const filename = `cdt-hp71-export-${new Date().toISOString().replace(/[:.]/g, "-")}.csv`;
+      downloadTextFile(filename, `${csv}\n`, "text/csv;charset=utf-8");
+    } catch (error) {
+      console.error("Error exportando CSV HP71:", error);
+      window.alert("No se pudo exportar el CSV del ejercicio.");
+    } finally {
+      setExportingCsv(false);
+    }
+  }, [metPosition, recordData, recordRows]);
 
   // ---------- Envío de comandos al servidor ----------
   const sendCommand = useCallback(async (command: string, preferredBasePieceNumber = basePieceNumber) => {
@@ -805,11 +896,13 @@ export default function HP71Emulator({
         const tofMatch  = responseText.match(/TOF\s+(\d+(?:\.\d+)?)/);
 
         if (distMatch && qeMatch && tofMatch) {
-          setManualResults(prev => [...prev, {
+          const result = {
             alcance: parseFloat(distMatch[1]),
             elevacion: parseFloat(qeMatch[1]),
-            tof: parseFloat(tofMatch[1])
-          }]);
+            tof: parseFloat(tofMatch[1]),
+          };
+          setManualResults(prev => [...prev, result]);
+          onManualCalculationComplete?.({ ...result, rawOutput: responseText });
         }
       }
 
@@ -835,7 +928,7 @@ export default function HP71Emulator({
     } finally {
       setLoading(false);
     }
-  }, [basePieceNumber, loading, mapModelField, observerField, pieceField, targetField, recordInputField, onMapModelComplete, onObserverComplete, onPieceComplete, onTargetComplete, addMissionCapture, refreshRecordData]);
+  }, [basePieceNumber, loading, mapModelField, observerField, pieceField, targetField, recordInputField, onMapModelComplete, onObserverComplete, onPieceComplete, onTargetComplete, addMissionCapture, refreshRecordData, onManualCalculationComplete]);
 
   // ---------- Manejo unificado de teclas ----------
   const handleKeyPress = useCallback(
@@ -1034,6 +1127,14 @@ export default function HP71Emulator({
             className="h-10 px-6 rounded-xl border-2 border-[#F39C63] bg-[#0A0A0B]/60 text-[#F39C63] hover:bg-[#F39C63] hover:text-black transition-all flex items-center justify-center text-[11px] font-black uppercase tracking-[0.2em] shadow-2xl"
           >
             Record de tiro
+          </button>
+          <button
+            type="button"
+            onClick={exportExerciseCsv}
+            disabled={exportingCsv}
+            className="h-10 px-6 rounded-xl border-2 border-[#85C5F1] bg-[#0A0A0B]/60 text-[#85C5F1] hover:bg-[#85C5F1] hover:text-black disabled:cursor-not-allowed disabled:opacity-50 transition-all flex items-center justify-center text-[11px] font-black uppercase tracking-[0.2em] shadow-2xl"
+          >
+            {exportingCsv ? "Exportando..." : "Exportar datos"}
           </button>
         </div>
 

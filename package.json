@@ -77,6 +77,7 @@
     "typescript": "^5"
   },
   "description": "Centro de tiro de cálculo automático para artillería.",
+  "homepage": "https://udh.edu.hn",
   "author": "Universidad de Defensa de Honduras UDH",
   "build": {
     "appId": "udh.santabarbara.cdt",
@@ -128,6 +129,7 @@
       "publisherName": "Universidad de Defensa de Honduras UDH"
     },
     "nsis": {
+      "include": "scripts/installer.nsh",
       "oneClick": false,
       "perMachine": false,
       "allowToChangeInstallationDirectory": true,

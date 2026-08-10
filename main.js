@@ -2,10 +2,11 @@ const { app, BrowserWindow, dialog, Menu, nativeTheme, session } = require('elec
 const { spawn } = require('child_process');
 const fs = require('fs');
 const http = require('http');
+const net = require('net');
 const path = require('path');
 
 const isDev = process.env.NODE_ENV === 'development';
-const NEXT_PORT = process.env.CDT_NEXT_PORT || '3210';
+let NEXT_PORT = process.env.CDT_NEXT_PORT || '3210';
 const HP71_PORT = process.env.CDT_HP71_PORT || '8080';
 const DEFAULT_AUTH_SECRET = 'santa-barbara-secret-key-2026-tactical-direction';
 const SPLASH_WIDTH = 780;
@@ -21,6 +22,75 @@ app.commandLine.appendSwitch('enable-webgl');
 let nextProcess;
 let hp71Process;
 let geolocationPermission;
+let cdtLaunchContext = readCdtLaunchContext();
+
+function readArgValue(name) {
+  const prefix = `--${name}=`;
+  const direct = process.argv.find((arg) => arg.startsWith(prefix));
+  if (direct) return direct.slice(prefix.length);
+
+  const index = process.argv.indexOf(`--${name}`);
+  return index >= 0 ? process.argv[index + 1] : undefined;
+}
+
+function readCdtLaunchContext() {
+  const contextFile = readArgValue('cdt-session-file');
+  if (contextFile) {
+    return { contextFile };
+  }
+
+  const sessionToken = readArgValue('sessionToken') || readArgValue('session-token');
+  const deviceId = readArgValue('deviceId') || readArgValue('device-id');
+  const applicationCode = readArgValue('applicationCode') || readArgValue('application-code');
+  const profileJson = readArgValue('profileJson') || readArgValue('profile-json');
+
+  if (!sessionToken || !deviceId || !applicationCode || applicationCode.toLowerCase() !== 'cdt') {
+    return null;
+  }
+
+  return { sessionToken, deviceId, applicationCode: applicationCode.toLowerCase(), profileJson };
+}
+
+function appendRuntimeLog(fileName, message) {
+  try {
+    const logDir = path.join(app.getPath('userData'), 'logs');
+    fs.mkdirSync(logDir, { recursive: true });
+    fs.appendFileSync(
+      path.join(logDir, fileName),
+      `[${new Date().toISOString()}] ${message}\n`,
+      'utf8'
+    );
+  } catch {
+    // Logging must never break app startup.
+  }
+}
+
+function isPortAvailable(port, host = '127.0.0.1') {
+  return new Promise((resolve) => {
+    const server = net.createServer();
+    server.once('error', () => resolve(false));
+    server.once('listening', () => {
+      server.close(() => resolve(true));
+    });
+    server.listen(port, host);
+  });
+}
+
+async function chooseAvailablePort(preferredPort) {
+  const preferred = Number(preferredPort);
+  if (Number.isInteger(preferred) && preferred > 0 && await isPortAvailable(preferred)) {
+    return String(preferred);
+  }
+
+  for (let port = 3211; port <= 3299; port += 1) {
+    if (await isPortAvailable(port)) {
+      appendRuntimeLog('next.log', `Puerto ${preferredPort} no disponible; usando ${port}.`);
+      return String(port);
+    }
+  }
+
+  throw new Error('No se encontró un puerto libre para iniciar Next.');
+}
 
 function getResourcesPath() {
   return app.isPackaged ? process.resourcesPath : __dirname;
@@ -49,7 +119,7 @@ function waitForServer(url, timeoutMs = 30000) {
 
       req.on('error', () => {
         if (Date.now() - startedAt > timeoutMs) {
-          reject(new Error(`Timed out waiting for ${url}`));
+          reject(new Error(`No se pudo abrir el servidor interno en ${url}. Revisá los logs de CDT.`));
           return;
         }
 
@@ -216,18 +286,28 @@ function startNextServer() {
       AUTH_URL: `http://127.0.0.1:${NEXT_PORT}`,
       NEXTAUTH_URL: `http://127.0.0.1:${NEXT_PORT}`,
       HP71_BACKEND_URL: `http://127.0.0.1:${HP71_PORT}`,
+      ...(cdtLaunchContext?.contextFile ? { CDT_SESSION_CONTEXT_FILE: cdtLaunchContext.contextFile } : {}),
+      ...(cdtLaunchContext?.sessionToken ? { CDT_SESSION_TOKEN: cdtLaunchContext.sessionToken } : {}),
+      ...(cdtLaunchContext?.deviceId ? { CDT_DEVICE_ID: cdtLaunchContext.deviceId } : {}),
+      ...(cdtLaunchContext?.applicationCode ? { CDT_APPLICATION_CODE: cdtLaunchContext.applicationCode } : {}),
+      ...(cdtLaunchContext?.profileJson ? { CDT_PROFILE_JSON: cdtLaunchContext.profileJson } : {}),
     },
-    stdio: 'ignore',
+    stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
   });
 
+  nextProcess.stdout.on('data', (data) => appendRuntimeLog('next.log', data.toString().trimEnd()));
+  nextProcess.stderr.on('data', (data) => appendRuntimeLog('next.log', data.toString().trimEnd()));
+
   nextProcess.on('exit', (code) => {
     if (code !== 0 && !app.isQuitting) {
-      dialog.showErrorBox('CDT', `El servidor interno de Next se cerró con código ${code}.`);
+      appendRuntimeLog('next.log', `Servidor Next cerrado con código ${code}.`);
+      dialog.showErrorBox('CDT', `El servidor interno de Next se cerró con código ${code}. Revisá los logs de CDT.`);
     }
   });
 
   nextProcess.on('error', (error) => {
+    appendRuntimeLog('next.log', `No se pudo iniciar Next: ${error.message}`);
     dialog.showErrorBox('CDT', `No se pudo iniciar el servidor interno de Next: ${error.message}`);
   });
 }
@@ -262,17 +342,22 @@ function startHp71Server() {
       PORT: HP71_PORT,
       CDT_HP71_HEADLESS: '1',
     },
-    stdio: 'ignore',
+    stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
   });
 
+  hp71Process.stdout.on('data', (data) => appendRuntimeLog('hp71.log', data.toString().trimEnd()));
+  hp71Process.stderr.on('data', (data) => appendRuntimeLog('hp71.log', data.toString().trimEnd()));
+
   hp71Process.on('error', (error) => {
+    appendRuntimeLog('hp71.log', `No se pudo iniciar HP71: ${error.message}`);
     dialog.showErrorBox('CDT', `No se pudo iniciar HP71: ${error.message}`);
   });
 
   hp71Process.on('exit', (code) => {
     if (code !== 0 && !app.isQuitting) {
-      dialog.showErrorBox('CDT', `El servidor HP71 se cerró con código ${code}.`);
+      appendRuntimeLog('hp71.log', `Servidor HP71 cerrado con código ${code}.`);
+      dialog.showErrorBox('CDT', `El servidor HP71 se cerró con código ${code}. La interfaz seguirá disponible, pero la calculadora HP71 puede no responder.`);
     }
   });
 }
@@ -310,13 +395,22 @@ app.whenReady().then(async () => {
   app.setName('CDT Santa Barbara');
   nativeTheme.themeSource = 'dark';
   Menu.setApplicationMenu(null);
+  if (!isDev) {
+    NEXT_PORT = await chooseAvailablePort(NEXT_PORT);
+  }
   configurePermissions();
   const splashPromise = showSplashWindow();
   startHp71Server();
-  if (!isDev) {
-    await waitForServer(`http://127.0.0.1:${HP71_PORT}`, 15000);
-  }
   startNextServer();
+  if (!isDev) {
+    waitForServer(`http://127.0.0.1:${HP71_PORT}`, 15000).catch((error) => {
+      appendRuntimeLog('hp71.log', error.message);
+      dialog.showErrorBox(
+        'CDT',
+        `HP71 no respondió en el puerto ${HP71_PORT}. La interfaz seguirá disponible, pero la calculadora puede no funcionar.`
+      );
+    });
+  }
   const win = await createWindow();
   await splashPromise;
   win.maximize();

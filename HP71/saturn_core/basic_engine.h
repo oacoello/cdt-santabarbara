@@ -17,6 +17,10 @@ public:
     std::string execute(const std::string& cmd);
     std::string recordDataJson();
     std::string resetData();
+
+    static int obs_id;
+    static double obs_gz;
+
 private:
 
     //////////////////////////////////////////////////
@@ -39,9 +43,6 @@ private:
     double obs_alt = 0;
     double obs_n = 0;
     double obs_e = 0;
-
-    static int obs_id;
-    static double obs_gz;
 
     //////////////////////////////////////////////////
     // MET / MAP
