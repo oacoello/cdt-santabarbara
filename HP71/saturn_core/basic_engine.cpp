@@ -215,6 +215,19 @@ static std::string artillery_type = "155";
 static std::string ammo_proj_prop = "";
 static std::string ammo_proj_lot = "";
 
+struct ObserverData
+{
+    int id = 0;
+    double e = 0;
+    double n = 0;
+    double alt = 0;
+    double gz = 0;
+};
+
+static std::map<int, ObserverData> observers;
+static int obs_expected_qty = 1;
+static int obs_current_index = 1;
+
 static double obs_alt = 0;
 static double obs_e = 0;
 static double obs_n = 0;
@@ -587,12 +600,33 @@ void saveReportPDF(const std::vector<std::string>& lines, int mission_counter)
     body_lines.push_back("OBSERVER");
     body_lines.push_back(makeSeparator());
 
-    std::stringstream obs_ss;
-    obs_ss << "ALT: " << (int)obs_alt
-        << "  E: " << (int)obs_e
-        << "  N: " << (int)obs_n;
+    if(observers.empty())
+    {
+        std::stringstream obs_ss;
+        obs_ss << "OBS: " << (int)BasicEngine::obs_id
+            << "  E: " << (int)obs_e
+            << "  N: " << (int)obs_n
+            << "  ALT: " << (int)obs_alt
+            << "  GZ: " << (int)BasicEngine::obs_gz;
 
-    body_lines.push_back(obs_ss.str());
+        body_lines.push_back(obs_ss.str());
+    }
+    else
+    {
+        for(const auto& item : observers)
+        {
+            const ObserverData& obs = item.second;
+
+            std::stringstream obs_ss;
+            obs_ss << "OBS: " << obs.id
+                << "  E: " << (int)obs.e
+                << "  N: " << (int)obs.n
+                << "  ALT: " << (int)obs.alt
+                << "  GZ: " << (int)obs.gz;
+
+            body_lines.push_back(obs_ss.str());
+        }
+    }
     body_lines.push_back("");
 
     // ==============================
@@ -1388,7 +1422,7 @@ std::string BasicEngine::execute(const std::string& input)
         if(use_fm1_reverse)
             def = def_base - (mils - az_lay);
         else
-            def = def_base + (mils - az_lay);
+            def = def_base - (mils - az_lay);
 
         if(!use_fm1_reverse)
             def += reg_def + df_corr;
@@ -1417,7 +1451,7 @@ std::string BasicEngine::execute(const std::string& input)
             std::cout << "AZ=" << mils << "\n";
             std::cout << "AZ_LAY=" << az_lay << "\n";
             std::cout << "REF_DEF=" << def_base << "\n";
-            std::cout << "DEF_BEFORE_CORR=" << (def_base + (mils - az_lay)) << "\n";
+            std::cout << "DEF_BEFORE_CORR=" << (def_base - (mils - az_lay)) << "\n";
             std::cout << "REG_DEF=" << reg_def << "\n";
             std::cout << "DF_CORR=" << df_corr << "\n";
             std::cout << "DRIFT=" << drift << "\n";
@@ -1556,7 +1590,7 @@ std::string BasicEngine::execute(const std::string& input)
         if(use_fm1_reverse_ref)
             def_ref = def_base - (mils - az_lay);
         else
-            def_ref = def_base + (mils - az_lay);
+            def_ref = def_base - (mils - az_lay);
 
         if(!use_fm1_reverse_ref)
             def_ref += reg_def + df_corr;
@@ -2046,9 +2080,15 @@ if(!fm4.empty())
 
         if(cmd=="4")
         {
-            current_menu="OBS";
-            input_stage=0;
-            return "OBS ALT:";
+            current_menu = "OBS";
+            input_stage = 0;
+
+            if(obs_current_index <= 0)
+                obs_current_index = 1;
+
+            BasicEngine::obs_id = obs_current_index;
+
+            return "PO #" + std::to_string(obs_current_index) + " (P *): " + std::to_string(obs_current_index);
         }
 
         if(cmd=="5")
@@ -2558,48 +2598,154 @@ if(current_menu=="TARGET")
 
 if(current_menu=="OBS")
 {
-    // 🔙 BACK CON P
+    if(cmd=="*")
+    {
+        current_menu = "MAIN";
+        input_stage = 0;
+        return "MAIN (? 1 3 4 5 7 X *)";
+    }
+
+    // BACK CON P
     if(cmd=="P")
     {
-        if(input_stage > 0) input_stage--;
+        if(input_stage > 0)
+            input_stage--;
 
         switch(input_stage)
         {
-            case 0: return "OBS ALT (P *): " + std::to_string((int)obs_alt);
-            case 1: return "OBS E (P *): " + std::to_string((int)obs_e);
-            case 2: return "OBS N (P *): " + std::to_string((int)obs_n);
+            case 0:
+                return "PO #" + std::to_string(obs_current_index) + " (P *): " + std::to_string(obs_current_index);
+
+            case 1:
+                return "PO #" + std::to_string((int)BasicEngine::obs_id) + " E (P *): " + std::to_string((int)obs_e);
+
+            case 2:
+                return "PO #" + std::to_string((int)BasicEngine::obs_id) + " N (P *): " + std::to_string((int)obs_n);
+
+            case 3:
+                return "PO #" + std::to_string((int)BasicEngine::obs_id) + " ALT (P *): " + std::to_string((int)obs_alt);
         }
     }
 
     std::string v = normStr(cmd);
 
-    if(input_stage==0)
+    if(input_stage == 0)
     {
-        if(!v.empty()) obs_alt = std::stod(v);
-        input_stage++;
-        return "OBS E (P *): " + std::to_string((int)obs_e);
+        int selected_po = obs_current_index;
+
+        if(!v.empty())
+        {
+            try
+            {
+                selected_po = std::stoi(v);
+            }
+            catch(...)
+            {
+                return "PO #" + std::to_string(obs_current_index) + " (P *): " + std::to_string(obs_current_index);
+            }
+        }
+
+        if(selected_po <= 0)
+            selected_po = obs_current_index;
+
+        BasicEngine::obs_id = selected_po;
+
+        if(observers.find(BasicEngine::obs_id) != observers.end())
+        {
+            obs_e = observers[BasicEngine::obs_id].e;
+            obs_n = observers[BasicEngine::obs_id].n;
+            obs_alt = observers[BasicEngine::obs_id].alt;
+            BasicEngine::obs_gz = observers[BasicEngine::obs_id].gz;
+        }
+        else
+        {
+            obs_e = 0;
+            obs_n = 0;
+            obs_alt = 0;
+            BasicEngine::obs_gz = 0;
+        }
+
+        input_stage = 1;
+
+        return "PO #" + std::to_string((int)BasicEngine::obs_id) + " E (P *): " + std::to_string((int)obs_e);
     }
 
-    if(input_stage==1)
+    if(input_stage == 1)
     {
-        if(!v.empty()) obs_e = std::stod(v);
-        input_stage++;
-        return "OBS N (P *): " + std::to_string((int)obs_n);
+        if(!v.empty())
+        {
+            try
+            {
+                obs_e = std::stod(v);
+            }
+            catch(...)
+            {
+                return "PO #" + std::to_string((int)BasicEngine::obs_id) + " E (P *): " + std::to_string((int)obs_e);
+            }
+        }
+
+        input_stage = 2;
+
+        return "PO #" + std::to_string((int)BasicEngine::obs_id) + " N (P *): " + std::to_string((int)obs_n);
     }
 
-    if(input_stage==2)
+    if(input_stage == 2)
     {
-        if(!v.empty()) obs_n = std::stod(v);
+        if(!v.empty())
+        {
+            try
+            {
+                obs_n = std::stod(v);
+            }
+            catch(...)
+            {
+                return "PO #" + std::to_string((int)BasicEngine::obs_id) + " N (P *): " + std::to_string((int)obs_n);
+            }
+        }
 
-        main_inputs.push_back("OBSERVER");
-        main_inputs.push_back("ALT " + std::to_string((int)obs_alt));
-        main_inputs.push_back("E " + std::to_string((int)obs_e));
-        main_inputs.push_back("N " + std::to_string((int)obs_n));
+        input_stage = 3;
+
+        return "PO #" + std::to_string((int)BasicEngine::obs_id) + " ALT (P *): " + std::to_string((int)obs_alt);
+    }
+
+    if(input_stage == 3)
+    {
+        if(!v.empty())
+        {
+            try
+            {
+                obs_alt = std::stod(v);
+            }
+            catch(...)
+            {
+                return "PO #" + std::to_string((int)BasicEngine::obs_id) + " ALT (P *): " + std::to_string((int)obs_alt);
+            }
+        }
+
+        ObserverData obs;
+        obs.id = BasicEngine::obs_id;
+        obs.e = obs_e;
+        obs.n = obs_n;
+        obs.alt = obs_alt;
+        obs.gz = BasicEngine::obs_gz;
+
+        observers[obs.id] = obs;
+
+        main_inputs.push_back("PO " + std::to_string(obs.id));
+        main_inputs.push_back("E " + std::to_string((int)obs.e));
+        main_inputs.push_back("N " + std::to_string((int)obs.n));
+        main_inputs.push_back("ALT " + std::to_string((int)obs.alt));
+        main_inputs.push_back("GZ " + std::to_string((int)obs.gz));
+
+        if(obs.id >= obs_current_index)
+            obs_current_index = obs.id + 1;
+
+        BasicEngine::obs_id = obs_current_index;
 
         current_menu = "MAIN";
         input_stage = 0;
 
-        return "OBS STORED\nMAIN (? 1 3 4 5 7 X *)";
+        return "PO " + std::to_string(obs.id) + " STORED\nMAIN (? 1 3 4 5 7 X *)";
     }
 }
 
@@ -2782,10 +2928,27 @@ if(current_menu=="MAP_MODEL")
             <<" WT "<<ammo_proj_wt<<"\n";
 
             // OBS
-            out<<"OBS ALT "<<obs_alt
-            <<" E "<<obs_e
-            <<" N "<<obs_n
-            <<" GZ "<<obs_gz<<"\n";
+            if(observers.empty())
+            {
+                out << "OBS " << BasicEngine::obs_id
+                    << " E " << obs_e
+                    << " N " << obs_n
+                    << " ALT " << obs_alt
+                    << " GZ " << BasicEngine::obs_gz << "\n";
+            }
+            else
+            {
+                for(const auto& item : observers)
+                {
+                    const ObserverData& obs = item.second;
+
+                    out << "OBS " << obs.id
+                        << " E " << obs.e
+                        << " N " << obs.n
+                        << " ALT " << obs.alt
+                        << " GZ " << obs.gz << "\n";
+                }
+            }
 
             // MAP
             out<<"MAP EMAX "<<map_e_max
@@ -4055,7 +4218,7 @@ if(current_menu=="SHIFT")
             }
 
             // 🔥 DEF REAL LIMPIA
-            double def_real = def_base + (mils - az_lay);
+            double def_real = def_base - (mils - az_lay);
             def_real += df_corr;
 
             double drift_accum_real = drift * (tof / 25.0);
@@ -4108,7 +4271,7 @@ if(current_menu=="SHIFT")
                     drift_tmp = 0.00038 * dist;
                 }
 
-                double def_temp = def_base + (mils - az_lay);
+                double def_temp = def_base - (mils - az_lay);
                 def_temp += reg_def + df_corr;
 
                 double drift_accum = drift_tmp * (tof_tmp / 25.0);
@@ -4126,10 +4289,7 @@ if(current_menu=="SHIFT")
                 if(def_temp < min_def) min_def = def_temp;
             }
 
-                double error = (max_def - last_def_solution);
-
-                // 🔥 GANANCIA DOCTRINAL (AJUSTE FINAL)
-                reg_def += error * 2.5;
+                reg_def = 00;
             }
             else
             {
@@ -5100,9 +5260,14 @@ std::string BasicEngine::resetData()
     tgt_e=0;
     current_tgt_indicator="";
 
+    BasicEngine::obs_id = 0;
+    BasicEngine::obs_gz = 0;
     obs_alt=0;
     obs_n=0;
     obs_e=0;
+    obs_expected_qty = 1;
+    obs_current_index = 1;
+    observers.clear();
 
     wind_dir=0;
     wind_speed=0;

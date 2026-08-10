@@ -168,7 +168,7 @@ header h1 {
 }
 
 .cdt-control-panel {
-  min-width: min-content;
+  min-width: 0;
 }
 
 .cdt-section-card {
@@ -185,7 +185,7 @@ header h1 {
   scrollbar-color: rgba(243, 156, 99, 0.45) transparent;
 }
 
-@media (max-height: 980px), (max-width: 1680px) {
+@media (max-height: 1100px), (max-width: 1680px) {
   .cdt-control-inner {
     padding: 0.55rem !important;
   }
@@ -246,14 +246,73 @@ header h1 {
   }
 
   .cdt-control-dock {
-    max-height: 34dvh;
+    max-height: 36dvh;
+  }
+
+  .cdt-control-panel {
+    padding-left: 0.4rem !important;
+    padding-right: 0.4rem !important;
+  }
+
+  .cdt-control-sections {
+    display: grid !important;
+    grid-template-columns:
+      minmax(9.5rem, 0.7fr)
+      minmax(13rem, 0.95fr)
+      minmax(11rem, 0.8fr)
+      minmax(25.5rem, 1.5fr)
+      minmax(8.75rem, 0.6fr);
+    align-items: stretch !important;
+    gap: 0.45rem !important;
+  }
+
+  .cdt-control-sections > .cdt-section-card {
+    width: auto !important;
+    min-width: 0 !important;
+    max-width: none !important;
   }
 
   .cdt-section-card {
-    height: clamp(12rem, 22dvh, 14rem) !important;
+    height: clamp(12rem, 25dvh, 13.5rem) !important;
     border-radius: 14px !important;
     padding-left: 0.75rem !important;
     padding-right: 0.75rem !important;
+    padding-top: 1.45rem !important;
+    padding-bottom: 0.55rem !important;
+    overflow: visible;
+  }
+
+  .cdt-section-card h2 {
+    font-size: 0.92rem !important;
+  }
+
+  .cdt-map-model-body {
+    row-gap: 0.45rem !important;
+  }
+
+  .cdt-map-model-main-grid {
+    gap: 0.35rem 0.45rem !important;
+  }
+
+  .cdt-map-model-action-row {
+    grid-template-columns: 0.7fr 0.7fr 1fr !important;
+    gap: 0.45rem !important;
+  }
+
+  .cdt-map-model-action-row button {
+    height: 2.35rem !important;
+    font-size: 0.58rem !important;
+    padding-left: 0.35rem !important;
+    padding-right: 0.35rem !important;
+  }
+
+  .cdt-section-card input,
+  .cdt-section-card [role="combobox"] {
+    height: 1.85rem !important;
+    font-size: 0.78rem !important;
+    border-radius: 0.65rem !important;
+    padding-left: 0.55rem !important;
+    padding-right: 0.55rem !important;
   }
 
   .cdt-map-overlay {
@@ -269,6 +328,37 @@ header h1 {
     padding: 0.8rem !important;
     border-radius: 16px !important;
   }
+
+  .cdt-side-panel svg {
+    width: 0.9rem !important;
+    height: 0.9rem !important;
+  }
+
+  .cdt-side-panel button,
+  .cdt-side-panel input {
+    min-height: 0 !important;
+  }
+
+  .cdt-coordinate-row {
+    grid-template-columns: 4.1rem repeat(3, minmax(4.5rem, 1fr)) 5.8rem 2.15rem !important;
+    gap: 0.3rem !important;
+    padding-bottom: 0.35rem !important;
+  }
+
+  .cdt-coordinate-row > div:first-child {
+    font-size: 0.62rem !important;
+    letter-spacing: 0.04em !important;
+  }
+
+  .cdt-coordinate-row button {
+    height: 1.85rem !important;
+    min-height: 0 !important;
+    border-radius: 0.65rem !important;
+    font-size: 0.55rem !important;
+    letter-spacing: 0.04em !important;
+    padding-left: 0.25rem !important;
+    padding-right: 0.25rem !important;
+  }
 }
 
 @media (max-height: 760px) {
@@ -277,15 +367,158 @@ header h1 {
   }
 
   .cdt-control-dock {
-    max-height: 32dvh;
+    max-height: 38dvh;
   }
 
   .cdt-section-card {
-    height: auto !important;
+    height: 11.5rem !important;
     min-height: 11.5rem !important;
   }
 
   .cdt-control-sections {
     align-items: stretch !important;
+  }
+}
+
+@media (max-width: 1380px) {
+  .cdt-map-stage {
+    min-height: clamp(15rem, 50dvh, 28rem);
+    padding: 0.4rem !important;
+  }
+
+  .cdt-control-dock {
+    max-height: 48dvh;
+  }
+
+  .cdt-control-inner {
+    padding: 0.35rem !important;
+  }
+
+  .cdt-control-sections {
+    grid-template-columns:
+      minmax(8.5rem, 0.65fr)
+      minmax(11.75rem, 0.95fr)
+      minmax(10rem, 0.75fr)
+      minmax(23.5rem, 1.6fr)
+      minmax(7.75rem, 0.55fr);
+    gap: 0.35rem !important;
+  }
+
+  .cdt-section-card {
+    height: 12.25rem !important;
+    min-height: 12.25rem !important;
+    padding-left: 0.55rem !important;
+    padding-right: 0.55rem !important;
+    padding-top: 1.35rem !important;
+    padding-bottom: 0.45rem !important;
+    border-radius: 12px !important;
+  }
+
+  .cdt-section-card h2 {
+    font-size: 0.82rem !important;
+  }
+
+  .cdt-map-model-main-grid {
+    gap: 0.25rem 0.35rem !important;
+  }
+
+  .cdt-map-model-body span,
+  .cdt-section-card span {
+    letter-spacing: 0.04em !important;
+  }
+
+  .cdt-section-card input,
+  .cdt-section-card [role="combobox"] {
+    height: 1.65rem !important;
+    font-size: 0.72rem !important;
+  }
+
+  .cdt-map-model-action-row button {
+    height: 2rem !important;
+    font-size: 0.52rem !important;
+  }
+
+  .cdt-coordinate-row {
+    grid-template-columns: 3.7rem repeat(3, minmax(4.15rem, 1fr)) 5.25rem 1.95rem !important;
+    gap: 0.25rem !important;
+    padding-bottom: 0.22rem !important;
+  }
+
+  .cdt-coordinate-input {
+    height: 1.55rem !important;
+    font-size: 0.68rem !important;
+  }
+
+  .cdt-coordinate-row button {
+    height: 1.55rem !important;
+    font-size: 0.48rem !important;
+    border-radius: 0.55rem !important;
+  }
+
+  .cdt-card-actions button {
+    width: 100% !important;
+    height: 2.25rem !important;
+    font-size: 0.55rem !important;
+  }
+
+  .cdt-card-actions .material-symbols-outlined,
+  .cdt-coordinate-row .material-symbols-outlined {
+    font-size: 0.95rem !important;
+    line-height: 1 !important;
+  }
+}
+
+@media (max-width: 1380px) and (max-height: 800px) {
+  .cdt-map-stage {
+    min-height: 12rem;
+  }
+
+  .cdt-control-dock {
+    max-height: 52dvh;
+  }
+
+  .cdt-section-card {
+    height: 12.75rem !important;
+    min-height: 12.75rem !important;
+  }
+
+  .cdt-side-panel {
+    gap: 0.35rem !important;
+  }
+
+  .cdt-side-panel > div {
+    padding: 0.55rem !important;
+    border-radius: 12px !important;
+    border-width: 1px !important;
+  }
+
+  .cdt-side-panel .grid {
+    gap: 0.35rem !important;
+  }
+
+  .cdt-side-panel p {
+    margin-bottom: 0.45rem !important;
+    font-size: 0.55rem !important;
+  }
+
+  .cdt-side-panel span {
+    font-size: 0.55rem !important;
+  }
+
+  .cdt-side-panel button,
+  .cdt-side-panel input {
+    height: 1.75rem !important;
+    border-radius: 0.55rem !important;
+    font-size: 0.6rem !important;
+  }
+
+  .cdt-side-panel svg {
+    width: 0.75rem !important;
+    height: 0.75rem !important;
+  }
+
+  .cdt-card-actions .material-symbols-outlined,
+  .cdt-coordinate-row .material-symbols-outlined {
+    font-size: 0.8rem !important;
   }
 }

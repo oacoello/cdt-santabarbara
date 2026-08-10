@@ -1,9 +1,40 @@
 import os
 import csv
 
-OUTPUT_PATH = r"C:\Users\dolfo\Documents\hp71_emulator\tables\tables.csv"
+OUTPUT_PATH = r"C:\Users\oacoe\My Docs\SANTA BARBARA\CDT\HP71\tables.csv"
 
 os.makedirs(os.path.dirname(OUTPUT_PATH), exist_ok=True)
+
+
+# ============================================================
+# CALIBRACION PROVISIONAL GENERAL 105MM
+# ============================================================
+#
+# Motivo:
+# - Comparativa con HP71B fisica disponible:
+#   ART 105 / HEA / CHG 4 / DIST 4399
+#   Virtual anterior: QE aprox 208.2 / TOF 16.0751
+#   HP fisica:        QE aprox 331.9 / TOF 18.2
+#
+# Decision:
+# - NO se fuerza una distancia.
+# - NO se fuerza un proyectil especifico.
+# - NO se toca 155mm.
+# - Se eleva la curva base general de TODO 105mm de forma provisional.
+#
+# Cuando existan mas comparativas reales, estos parametros se afinan.
+# ============================================================
+
+BASE_105_SCALE = 66.0
+CHG_105_SCALE = 10.5
+CURVE_105_SCALE = 0.42
+TOF_105_SCALE = 251.0
+
+# Valores originales previos:
+# BASE_105_SCALE = 38.0
+# CHG_105_SCALE = 10.5
+# CURVE_105_SCALE = 0.42
+# TOF_105_SCALE = 285.0
 
 
 def write_row(writer, art, proj, chg, dist, qe, tof, drift):
@@ -16,6 +47,113 @@ def write_row(writer, art, proj, chg, dist, qe, tof, drift):
         round(float(tof), 4),
         round(float(drift), 4)
     ])
+
+
+def clamp(value, low, high):
+    return max(low, min(high, value))
+
+
+def smoothstep(edge0, edge1, x):
+    if edge0 == edge1:
+        return 0.0
+
+    t = (x - edge0) / (edge1 - edge0)
+    t = clamp(t, 0.0, 1.0)
+
+    return t * t * (3.0 - 2.0 * t)
+
+
+def chg6_low_curve_factor(art, proj, chg, dist):
+    art = int(art)
+    proj = str(proj).upper()
+    chg = int(chg)
+
+    if art != 155:
+        return 0.0
+
+    if proj not in ("HEA", "M4A2"):
+        return 0.0
+
+    if chg != 6:
+        return 0.0
+
+    start = 9000.0
+    full = 9300.0
+    fade_start = 9600.0
+    end = 10000.0
+
+    if dist < start or dist >= end:
+        return 0.0
+
+    if dist < full:
+        return smoothstep(start, full, dist)
+
+    if dist <= fade_start:
+        return 1.0
+
+    return 1.0 - smoothstep(fade_start, end, dist)
+
+
+def chg6_mid_curve_factor(art, proj, chg, dist):
+    art = int(art)
+    proj = str(proj).upper()
+    chg = int(chg)
+
+    if art != 155:
+        return 0.0
+
+    if proj not in ("HEA", "M4A2"):
+        return 0.0
+
+    if chg != 6:
+        return 0.0
+
+    start = 9900.0
+    full_start = 10050.0
+    full_end = 10300.0
+    end = 10400.0
+
+    if dist < start or dist >= end:
+        return 0.0
+
+    if dist < full_start:
+        return smoothstep(start, full_start, dist)
+
+    if dist <= full_end:
+        return 1.0
+
+    return 1.0 - smoothstep(full_end, end, dist)
+
+
+def chg6_near_mid_curve_factor(art, proj, chg, dist):
+    art = int(art)
+    proj = str(proj).upper()
+    chg = int(chg)
+
+    if art != 155:
+        return 0.0
+
+    if proj not in ("HEA", "M4A2"):
+        return 0.0
+
+    if chg != 6:
+        return 0.0
+
+    start = 9900.0
+    full_start = 10000.0
+    full_end = 10100.0
+    end = 10200.0
+
+    if dist < start or dist >= end:
+        return 0.0
+
+    if dist < full_start:
+        return smoothstep(start, full_start, dist)
+
+    if dist <= full_end:
+        return 1.0
+
+    return 1.0 - smoothstep(full_end, end, dist)
 
 
 def add_table_block(
@@ -36,25 +174,6 @@ def add_table_block(
     tof_bias=0.0,
     drift_bias=0.0
 ):
-    """
-    Generador provisional refinado.
-
-    IMPORTANTE:
-    Esto NO es tabla oficial.
-    Es una tabla empirica provisional para que el emulador tenga:
-    - mas puntos de interpolacion
-    - mejor comportamiento por carga
-    - seleccion de carga mas parecida a la esperada
-
-    power > 1.0:
-        proyectil/carga mas potente.
-        Para la misma distancia baja QE y TOF.
-
-    power < 1.0:
-        proyectil/carga menos potente.
-        Para la misma distancia sube QE y TOF.
-    """
-
     for d in range(dmin, dmax + 1, step):
         km = d / 1000.0
 
@@ -65,151 +184,170 @@ def add_table_block(
 
         drift = ((d / 10000.0) * chg * drift_scale) + drift_bias
 
+        low_factor = chg6_low_curve_factor(art, proj, chg, d)
+
+        qe *= 1.0 - (0.075 * low_factor)
+        tof *= 1.0 - (0.135 * low_factor)
+        drift *= 1.0 - (0.850 * low_factor)
+
+        if drift < 0.0:
+            drift = 0.0
+
         write_row(writer, art, proj, chg, d, qe, tof, drift)
 
 
-def add_105_family(writer):
+def add_105_projectile_family(
+    writer,
+    proj,
+    drift_scale=1.00,
+    power=1.00,
+    qe_bias=0.0,
+    tof_bias=0.0,
+    drift_bias=0.0
+):
     """
-    105 mm.
-    Aqui SI dejamos CHG 4.
+    Genera una familia completa 105mm para cargas 4, 5, 6 y 7.
 
-    105 HE:
-        base provisional.
-
-    105 M1:
-        parecido a HE.
-
-    105 M67:
-        parecido a HE por ahora.
-
-    105 HEA:
-        mas potente que HE.
-
-    105 ILA:
-        menos potente / mas lento provisional.
+    CALIBRACION PROVISIONAL:
+    - Usa parametros generales BASE_105_SCALE y TOF_105_SCALE.
+    - Aplica a todo 105mm.
+    - No fuerza distancia ni proyectil.
+    - No toca 155mm.
     """
 
-    # ==================================================
-    # 105 HE / M1 / M67
-    # CHG 4, 5, 6, 7
-    # ==================================================
+    add_table_block(
+        writer, 105, proj, 4,
+        1000, 6000, 100,
+        base_scale=BASE_105_SCALE,
+        chg_scale=CHG_105_SCALE,
+        curve_scale=CURVE_105_SCALE,
+        tof_scale=TOF_105_SCALE,
+        drift_scale=drift_scale,
+        power=power,
+        qe_bias=qe_bias,
+        tof_bias=tof_bias,
+        drift_bias=drift_bias
+    )
 
-    for proj in ["HE", "M1", "M67"]:
-        add_table_block(
-            writer, 105, proj, 4,
-            1000, 6000, 100,
-            base_scale=38.0,
-            chg_scale=10.5,
-            curve_scale=0.42,
-            tof_scale=285.0,
-            drift_scale=1.00,
-            power=1.00
-        )
+    add_table_block(
+        writer, 105, proj, 5,
+        1500, 7500, 100,
+        base_scale=BASE_105_SCALE,
+        chg_scale=CHG_105_SCALE,
+        curve_scale=CURVE_105_SCALE,
+        tof_scale=TOF_105_SCALE,
+        drift_scale=drift_scale,
+        power=power,
+        qe_bias=qe_bias,
+        tof_bias=tof_bias,
+        drift_bias=drift_bias
+    )
 
-        add_table_block(
-            writer, 105, proj, 5,
-            1500, 7500, 100,
-            base_scale=38.0,
-            chg_scale=10.5,
-            curve_scale=0.42,
-            tof_scale=285.0,
-            drift_scale=1.00,
-            power=1.00
-        )
+    add_table_block(
+        writer, 105, proj, 6,
+        2000, 9000, 100,
+        base_scale=BASE_105_SCALE,
+        chg_scale=CHG_105_SCALE,
+        curve_scale=CURVE_105_SCALE,
+        tof_scale=TOF_105_SCALE,
+        drift_scale=drift_scale,
+        power=power,
+        qe_bias=qe_bias,
+        tof_bias=tof_bias,
+        drift_bias=drift_bias
+    )
 
-        add_table_block(
-            writer, 105, proj, 6,
-            2000, 9000, 100,
-            base_scale=38.0,
-            chg_scale=10.5,
-            curve_scale=0.42,
-            tof_scale=285.0,
-            drift_scale=1.00,
-            power=1.00
-        )
+    add_table_block(
+        writer, 105, proj, 7,
+        3000, 10000, 100,
+        base_scale=BASE_105_SCALE,
+        chg_scale=CHG_105_SCALE,
+        curve_scale=CURVE_105_SCALE,
+        tof_scale=TOF_105_SCALE,
+        drift_scale=drift_scale,
+        power=power,
+        qe_bias=qe_bias,
+        tof_bias=tof_bias,
+        drift_bias=drift_bias
+    )
 
-        add_table_block(
-            writer, 105, proj, 7,
-            3000, 10000, 100,
-            base_scale=38.0,
-            chg_scale=10.5,
-            curve_scale=0.42,
-            tof_scale=285.0,
-            drift_scale=1.00,
-            power=1.00
-        )
 
-    # ==================================================
-    # 105 HEA
-    # CHG 4, 5, 6, 7
-    # Mas potente que HE.
-    # ==================================================
+def add_105_hea_family(writer):
+    """
+    Genera HEA 105mm.
+
+    Usa la calibracion provisional general 105mm.
+    No se fuerza una distancia especifica.
+    """
 
     add_table_block(
         writer, 105, "HEA", 4,
         1000, 7000, 100,
-        base_scale=38.0,
-        chg_scale=10.5,
-        curve_scale=0.42,
-        tof_scale=285.0,
+        base_scale=BASE_105_SCALE,
+        chg_scale=CHG_105_SCALE,
+        curve_scale=CURVE_105_SCALE,
+        tof_scale=TOF_105_SCALE,
         drift_scale=0.96,
-        power=1.06,
-        qe_bias=-2.0,
-        tof_bias=-0.10
+        power=1.00,
+        qe_bias=0.0,
+        tof_bias=0.0
     )
 
     add_table_block(
         writer, 105, "HEA", 5,
         1500, 8500, 100,
-        base_scale=38.0,
-        chg_scale=10.5,
-        curve_scale=0.42,
-        tof_scale=285.0,
+        base_scale=BASE_105_SCALE,
+        chg_scale=CHG_105_SCALE,
+        curve_scale=CURVE_105_SCALE,
+        tof_scale=TOF_105_SCALE,
         drift_scale=0.96,
-        power=1.06,
-        qe_bias=-2.0,
-        tof_bias=-0.10
+        power=1.00,
+        qe_bias=0.0,
+        tof_bias=0.0
     )
 
     add_table_block(
         writer, 105, "HEA", 6,
         2000, 10000, 100,
-        base_scale=38.0,
-        chg_scale=10.5,
-        curve_scale=0.42,
-        tof_scale=285.0,
+        base_scale=BASE_105_SCALE,
+        chg_scale=CHG_105_SCALE,
+        curve_scale=CURVE_105_SCALE,
+        tof_scale=TOF_105_SCALE,
         drift_scale=0.96,
-        power=1.06,
-        qe_bias=-2.0,
-        tof_bias=-0.10
+        power=1.00,
+        qe_bias=0.0,
+        tof_bias=0.0
     )
 
     add_table_block(
         writer, 105, "HEA", 7,
         3000, 11500, 100,
-        base_scale=38.0,
-        chg_scale=10.5,
-        curve_scale=0.42,
-        tof_scale=285.0,
+        base_scale=BASE_105_SCALE,
+        chg_scale=CHG_105_SCALE,
+        curve_scale=CURVE_105_SCALE,
+        tof_scale=TOF_105_SCALE,
         drift_scale=0.96,
-        power=1.06,
-        qe_bias=-2.0,
-        tof_bias=-0.10
+        power=1.00,
+        qe_bias=0.0,
+        tof_bias=0.0
     )
 
-    # ==================================================
-    # 105 ILA
-    # CHG 4, 5, 6, 7
-    # Menos potente / mas lento provisional.
-    # ==================================================
+
+def add_105_ila_family(writer):
+    """
+    Genera ILA 105mm.
+
+    Se mantiene como familia propia, pero usando la curva base 105mm
+    provisional para que todo 105 quede calibrado bajo el mismo modelo.
+    """
 
     add_table_block(
         writer, 105, "ILA", 4,
         1000, 5000, 100,
-        base_scale=38.0,
-        chg_scale=10.5,
-        curve_scale=0.42,
-        tof_scale=285.0,
+        base_scale=BASE_105_SCALE,
+        chg_scale=CHG_105_SCALE,
+        curve_scale=CURVE_105_SCALE,
+        tof_scale=TOF_105_SCALE,
         drift_scale=1.04,
         power=0.96,
         qe_bias=3.0,
@@ -219,10 +357,10 @@ def add_105_family(writer):
     add_table_block(
         writer, 105, "ILA", 5,
         1500, 6500, 100,
-        base_scale=38.0,
-        chg_scale=10.5,
-        curve_scale=0.42,
-        tof_scale=285.0,
+        base_scale=BASE_105_SCALE,
+        chg_scale=CHG_105_SCALE,
+        curve_scale=CURVE_105_SCALE,
+        tof_scale=TOF_105_SCALE,
         drift_scale=1.04,
         power=0.96,
         qe_bias=3.0,
@@ -232,10 +370,10 @@ def add_105_family(writer):
     add_table_block(
         writer, 105, "ILA", 6,
         2000, 8000, 100,
-        base_scale=38.0,
-        chg_scale=10.5,
-        curve_scale=0.42,
-        tof_scale=285.0,
+        base_scale=BASE_105_SCALE,
+        chg_scale=CHG_105_SCALE,
+        curve_scale=CURVE_105_SCALE,
+        tof_scale=TOF_105_SCALE,
         drift_scale=1.04,
         power=0.96,
         qe_bias=3.0,
@@ -245,10 +383,10 @@ def add_105_family(writer):
     add_table_block(
         writer, 105, "ILA", 7,
         3000, 9000, 100,
-        base_scale=38.0,
-        chg_scale=10.5,
-        curve_scale=0.42,
-        tof_scale=285.0,
+        base_scale=BASE_105_SCALE,
+        chg_scale=CHG_105_SCALE,
+        curve_scale=CURVE_105_SCALE,
+        tof_scale=TOF_105_SCALE,
         drift_scale=1.04,
         power=0.96,
         qe_bias=3.0,
@@ -256,30 +394,42 @@ def add_105_family(writer):
     )
 
 
+def add_105_family(writer):
+    """
+    Familia completa 105mm.
+
+    Familias incluidas:
+    - HE
+    - M1
+    - M67
+    - HEA
+    - ILA
+
+    Calibracion provisional:
+    - Se aplica a todo 105mm.
+    - No se elimina ningun proyectil.
+    - No se fuerza ninguna carga.
+    - No se fuerza ninguna distancia.
+    - No se toca 155mm.
+    """
+
+    for proj in ["HE", "M1", "M67"]:
+        add_105_projectile_family(
+            writer,
+            proj,
+            drift_scale=1.00,
+            power=1.00,
+            qe_bias=0.0,
+            tof_bias=0.0,
+            drift_bias=0.0
+        )
+
+    add_105_hea_family(writer)
+
+    add_105_ila_family(writer)
+
+
 def add_155_family(writer):
-    """
-    155 mm.
-
-    IMPORTANTE:
-    HEA y M4A2 NO llevan CHG 4.
-
-    CORRECCION NUEVA:
-    HEA CHG 5 y M4A2 CHG 5 terminan en 8500 m.
-    Asi, a 9173 m el emulador NO puede escoger CHG 5
-    y debe subir a CHG 6, como en la hoja fisica.
-
-    Dejamos:
-    155 HE:   CHG 4, 5, 6, 7
-    155 ILA:  CHG 4, 5, 6, 7
-    155 HEA:  CHG 5, 6, 7
-    155 M4A2: CHG 5, 6, 7
-    """
-
-    # ==================================================
-    # 155 HE
-    # CHG 4, 5, 6, 7
-    # ==================================================
-
     add_table_block(
         writer, 155, "HE", 4,
         3000, 9000, 100,
@@ -324,13 +474,6 @@ def add_155_family(writer):
         power=1.00
     )
 
-    # ==================================================
-    # 155 HEA
-    # SIN CHG 4.
-    # CHG 5 hasta 8500.
-    # CHG 6 cubre 9173.
-    # ==================================================
-
     add_table_block(
         writer, 155, "HEA", 5,
         5000, 8500, 100,
@@ -349,12 +492,12 @@ def add_155_family(writer):
         6000, 19000, 100,
         base_scale=39.5,
         chg_scale=13.2,
-        curve_scale=0.32,
+        curve_scale=0.30,
         tof_scale=252.0,
         drift_scale=0.6267,
-        power=1.08,
-        qe_bias=-29.45,
-        tof_bias=-0.62
+        power=1.11,
+        qe_bias=-38.0,
+        tof_bias=-1.20
     )
 
     add_table_block(
@@ -369,13 +512,6 @@ def add_155_family(writer):
         qe_bias=-5.0,
         tof_bias=-0.30
     )
-
-    # ==================================================
-    # 155 M4A2
-    # SIN CHG 4.
-    # CHG 5 hasta 8500.
-    # Igual a HEA por ahora.
-    # ==================================================
 
     add_table_block(
         writer, 155, "M4A2", 5,
@@ -395,12 +531,12 @@ def add_155_family(writer):
         6000, 19000, 100,
         base_scale=39.5,
         chg_scale=13.2,
-        curve_scale=0.32,
+        curve_scale=0.30,
         tof_scale=252.0,
         drift_scale=0.6267,
-        power=1.08,
-        qe_bias=-29.45,
-        tof_bias=-0.62
+        power=1.11,
+        qe_bias=-38.0,
+        tof_bias=-1.20
     )
 
     add_table_block(
@@ -415,12 +551,6 @@ def add_155_family(writer):
         qe_bias=-5.0,
         tof_bias=-0.30
     )
-
-    # ==================================================
-    # 155 ILA
-    # CHG 4, 5, 6, 7
-    # Menos potente / mas lento provisional.
-    # ==================================================
 
     add_table_block(
         writer, 155, "ILA", 4,
@@ -485,10 +615,6 @@ def main():
 
     print("tables.csv generado correctamente")
     print("Salida:", OUTPUT_PATH)
-    print("Cambio aplicado:")
-    print("155 HEA CHG 5 hasta 8500 m")
-    print("155 M4A2 CHG 5 hasta 8500 m")
-    print("A 9173 m debe seleccionar CHG 6")
 
 
 if __name__ == "__main__":

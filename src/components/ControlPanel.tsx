@@ -259,7 +259,7 @@ export function ControlPanel({
           <div className="cdt-control-sections flex flex-col lg:flex-row items-stretch gap-3">
 
             {/* ─── Configuración de Arma ─── */}
-            <div className="relative flex-none w-full lg:w-60 cdt-section-card h-[18rem] rounded-[18px] border-2 border-[#F39C63] px-4 pb-4 pt-8 bg-[#0A0A0E]">
+            <div className="cdt-card-weapon relative flex-none w-full lg:w-60 cdt-section-card h-[18rem] rounded-[18px] border-2 border-[#F39C63] px-4 pb-4 pt-8 bg-[#0A0A0E]">
               <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0A0A0E] px-5">
                 <h2 className="text-lg font-black uppercase tracking-wide text-foreground leading-none whitespace-nowrap">Arma</h2>
               </div>
@@ -309,12 +309,12 @@ export function ControlPanel({
             </div>
 
             {/* ─── Mapa Modelo ─── */}
-            <div className="relative flex-none w-full lg:w-72 cdt-section-card h-[18rem] rounded-[18px] border-2 border-[#F39C63] px-5 pb-4 pt-8 bg-[#0A0A0E]">
+            <div className="cdt-card-map-model relative flex-none w-full lg:w-72 cdt-section-card h-[18rem] rounded-[18px] border-2 border-[#F39C63] px-5 pb-4 pt-8 bg-[#0A0A0E]">
               <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0A0A0E] px-5">
                 <h2 className="text-lg font-black uppercase tracking-wide text-foreground leading-none whitespace-nowrap">Mapa modelo</h2>
               </div>
               <div className="cdt-map-model-body space-y-3">
-                <div className="grid grid-cols-2 gap-x-4 gap-y-3">
+                <div className="cdt-map-model-main-grid grid grid-cols-2 gap-x-4 gap-y-3">
                   <div className="space-y-1">
                     <span className="text-[10px] uppercase font-bold text-muted-foreground ml-1 tracking-wider">MAX E</span>
                     <input
@@ -353,7 +353,7 @@ export function ControlPanel({
                   </div>
                 </div>
 
-                <div className="grid grid-cols-[0.8fr_0.8fr_1.3fr] gap-3 items-end">
+                <div className="cdt-map-model-action-row grid grid-cols-[0.8fr_0.8fr_1.3fr] gap-3 items-end">
                   <div className="space-y-1">
                     <span className="text-[10px] uppercase font-bold text-muted-foreground ml-1 tracking-wider">GZ</span>
                     <input
@@ -385,7 +385,7 @@ export function ControlPanel({
             <Separator orientation="vertical" className="hidden h-32 my-auto bg-border" />
 
             {/* ─── Datos de Tiro ─── */}
-            <div className="relative flex-none w-full lg:w-64 xl:w-72 cdt-section-card h-[18rem] rounded-[18px] border-2 border-[#F39C63] px-4 pb-4 pt-8 bg-[#0A0A0E]">
+            <div className="cdt-card-firing relative flex-none w-full lg:w-64 xl:w-72 cdt-section-card h-[18rem] rounded-[18px] border-2 border-[#F39C63] px-4 pb-4 pt-8 bg-[#0A0A0E]">
               <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0A0A0E] px-5">
                 <h2 className="text-lg font-black uppercase tracking-wide text-foreground leading-none whitespace-nowrap">Datos de tiro</h2>
               </div>
@@ -415,7 +415,7 @@ export function ControlPanel({
             <Separator orientation="vertical" className="hidden h-32 my-auto bg-border" />
 
             {/* ─── Ajustes Manuales ─── */}
-            <div className="relative flex-[1.35] min-w-[500px] cdt-section-card h-[18rem] rounded-[18px] border-2 border-[#F39C63] px-5 pb-4 pt-8 bg-[#0A0A0E]">
+            <div className="cdt-card-adjustments relative flex-[1.35] min-w-[500px] cdt-section-card h-[18rem] rounded-[18px] border-2 border-[#F39C63] px-5 pb-4 pt-8 bg-[#0A0A0E]">
               <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0A0A0E] px-5">
                 <h2 className="text-lg font-black uppercase tracking-wide text-foreground leading-none whitespace-nowrap">Ajustes</h2>
               </div>
@@ -450,7 +450,7 @@ export function ControlPanel({
             <Separator orientation="vertical" className="hidden h-32 my-auto bg-border" />
 
             {/* ─── Acciones Finales ─── */}
-            <div className="relative flex-none min-w-[190px] cdt-section-card h-[18rem] rounded-[18px] border-2 border-[#F39C63] px-4 pb-4 pt-8 bg-[#0A0A0E]">
+            <div className="cdt-card-actions relative flex-none min-w-[190px] cdt-section-card h-[18rem] rounded-[18px] border-2 border-[#F39C63] px-4 pb-4 pt-8 bg-[#0A0A0E]">
               <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0A0A0E] px-5">
                 <h2 className="text-lg font-black uppercase tracking-wide text-foreground leading-none whitespace-nowrap">Acciones</h2>
               </div>

@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, useMemo } from "react";
-import { Globe, Navigation, Search } from "lucide-react";
+import { Globe, Navigation, Search, Minus, Plus } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import dynamic from "next/dynamic";
 const TacticalMap = dynamic(
@@ -113,6 +113,20 @@ export function SimulatorTab({
 }: SimulatorTabProps) {
   const [otLine, setOtLine] = useState(0);
   const [searchQuery, setSearchQuery] = useState("");
+  const [collapsedPanels, setCollapsedPanels] = useState({
+    location: false,
+    battery: false,
+    meteorology: false,
+    observer: false,
+  });
+
+  const collapsePanel = (panel: keyof typeof collapsedPanels) => {
+    setCollapsedPanels((prev) => ({ ...prev, [panel]: true }));
+  };
+
+  const expandPanel = (panel: keyof typeof collapsedPanels) => {
+    setCollapsedPanels((prev) => ({ ...prev, [panel]: false }));
+  };
 
   const handleSearch = (e: React.KeyboardEvent<HTMLInputElement>) => {
     if (e.key === 'Enter' && searchQuery.trim() !== "") {
@@ -219,13 +233,27 @@ export function SimulatorTab({
         <div className="cdt-map-overlay relative z-20 h-full min-h-0 grid grid-cols-[minmax(15rem,18rem)_minmax(20rem,1fr)_minmax(15rem,18rem)] gap-3 pointer-events-none">
         {/* Panel Izquierdo: Localización */}
         <div className="cdt-side-panel h-full min-h-0 flex flex-col gap-3 pointer-events-auto">
+          {collapsedPanels.location ? (
+            <CollapsedPanelButton label="Localización" onClick={() => expandPanel("location")} />
+          ) : (
           <div className="bg-[#0A0A0B] p-5 rounded-[20px] border-2 border-[#F39C63] shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2 text-[#F39C63]">
                 <Globe className="w-4 h-4" />
                 <span className="text-xs font-black uppercase tracking-widest">LOCALIZACIÓN</span>
               </div>
-              <span className="text-[10px] font-mono text-[#F39C63]/80 border border-[#F39C63]/30 px-2 py-0.5 rounded">WGS84-S1</span>
+              <div className="flex items-center gap-1">
+                <span className="text-[10px] font-mono text-[#F39C63]/80 border border-[#F39C63]/30 px-2 py-0.5 rounded">WGS84-S1</span>
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  onClick={() => collapsePanel("location")}
+                  className="h-7 w-7 text-[#F39C63]/60 hover:text-[#F39C63]"
+                  title="Retraer localización"
+                >
+                  <Minus className="w-3 h-3" />
+                </Button>
+              </div>
             </div>
             <div className="grid grid-cols-2 gap-2 mb-2">
               <div className="flex flex-col border border-[#F39C63]/20 p-2 rounded">
@@ -248,10 +276,25 @@ export function SimulatorTab({
               </div>
             </div>
           </div>
+          )}
 
           {/* Configuración de Batería */}
+          {collapsedPanels.battery ? (
+            <CollapsedPanelButton label="Config. batería" onClick={() => expandPanel("battery")} />
+          ) : (
           <div className="bg-[#0A0A0B]/60 backdrop-blur-xl p-5 rounded-[20px] border-2 border-[#F39C63] shadow-2xl">
-            <p className="text-[11px] font-black uppercase tracking-[0.2em] text-[#F39C63] mb-4">Configuración de Batería</p>
+            <div className="mb-4 flex items-center justify-between gap-2">
+              <p className="mb-0 text-[11px] font-black uppercase tracking-[0.2em] text-[#F39C63]">Configuración de Batería</p>
+              <Button
+                variant="ghost"
+                size="icon"
+                onClick={() => collapsePanel("battery")}
+                className="h-7 w-7 flex-none text-[#F39C63]/60 hover:text-[#F39C63]"
+                title="Retraer configuración de batería"
+              >
+                <Minus className="w-3 h-3" />
+              </Button>
+            </div>
             <div className="flex gap-3 mb-6">
               {[4, 6, 9].map((n) => (
                 <button key={n} onClick={() => setNumPieces(n)} className={cn("flex-1 h-10 rounded-xl text-xs font-black border-2", numPieces === n ? "bg-[#F39C63] text-black border-[#F39C63]" : "text-white/70 border-[#F39C63]/40")}>{n}P</button>
@@ -268,6 +311,7 @@ export function SimulatorTab({
               ))}
             </div>
           </div>
+          )}
         </div>
 
         {/* Centro: Buscador Flotante */}
@@ -297,8 +341,16 @@ export function SimulatorTab({
 
         {/* Panel Derecho */}
         <div className="cdt-side-panel h-full min-h-0 flex flex-col gap-3 pointer-events-auto">
-          <MeteorologyPanel position={gunPosition || mapCenter} />
-          <AdvancedObserver otLine={otLine} setOtLine={setOtLine} onCorrection={(lr, ad) => handleAOCorrection(otLine, lr, ad)} />
+          {collapsedPanels.meteorology ? (
+            <CollapsedPanelButton label="Meteorología" onClick={() => expandPanel("meteorology")} />
+          ) : (
+            <MeteorologyPanel position={gunPosition || mapCenter} onCollapse={() => collapsePanel("meteorology")} />
+          )}
+          {collapsedPanels.observer ? (
+            <CollapsedPanelButton label="Observador" onClick={() => expandPanel("observer")} />
+          ) : (
+            <AdvancedObserver otLine={otLine} setOtLine={setOtLine} onCollapse={() => collapsePanel("observer")} onCorrection={(lr, ad) => handleAOCorrection(otLine, lr, ad)} />
+          )}
         </div>
         </div>
       </div>
@@ -321,5 +373,19 @@ export function SimulatorTab({
         />
       </div>
     </div>
+  );
+}
+
+function CollapsedPanelButton({ label, onClick }: { label: string; onClick: () => void }) {
+  return (
+    <Button
+      type="button"
+      variant="outline"
+      onClick={onClick}
+      className="cdt-collapsed-panel-button h-10 w-full justify-between rounded-xl border-2 border-[#F39C63]/70 bg-[#0A0A0B]/75 px-3 text-[10px] font-black uppercase tracking-[0.16em] text-[#F39C63] backdrop-blur-md hover:bg-[#F39C63]/10 hover:text-[#F39C63]"
+    >
+      <span>{label}</span>
+      <Plus className="h-3.5 w-3.5" />
+    </Button>
   );
 }

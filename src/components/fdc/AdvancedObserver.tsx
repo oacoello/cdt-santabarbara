@@ -5,15 +5,16 @@ import { Card } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
-import { Crosshair } from 'lucide-react';
+import { Crosshair, Minus } from 'lucide-react';
 
 interface AdvancedObserverProps {
   onCorrection: (lr: number, ad: number) => void;
   otLine: number;
   setOtLine: (val: number) => void;
+  onCollapse?: () => void;
 }
 
-export function AdvancedObserver({ onCorrection, otLine, setOtLine }: AdvancedObserverProps) {
+export function AdvancedObserver({ onCorrection, otLine, setOtLine, onCollapse }: AdvancedObserverProps) {
   const [lrInput, setLrInput] = useState(0);
   const [adInput, setAdInput] = useState(0);
 
@@ -24,7 +25,20 @@ export function AdvancedObserver({ onCorrection, otLine, setOtLine }: AdvancedOb
           <div className="w-2 h-2 rounded-full bg-[#F39C63]" />
           <h3 className="text-xs font-black uppercase tracking-widest text-[#F39C63]">Observador Avanzado</h3>
         </div>
-        <Crosshair className="w-4 h-4 text-[#F39C63]/50" />
+        <div className="flex items-center gap-1">
+          <Crosshair className="w-4 h-4 text-[#F39C63]/50" />
+          {onCollapse && (
+            <Button
+              variant="ghost"
+              size="icon"
+              onClick={onCollapse}
+              className="h-7 w-7 text-[#F39C63]/60 hover:text-[#F39C63] transition-colors"
+              title="Retraer observador"
+            >
+              <Minus className="w-3 h-3" />
+            </Button>
+          )}
+        </div>
       </div>
 
       <div className="space-y-5">
