@@ -19,7 +19,7 @@ export function AdvancedObserver({ onCorrection, otLine, setOtLine, onCollapse }
   const [adInput, setAdInput] = useState(0);
 
   return (
-    <Card className="p-3 bg-[#0A0A0B]/60 border-[#F39C63] border-2 w-72 rounded-xl backdrop-blur-md">
+    <Card className="p-3 bg-[#0A0A0B]/60 border-[#F39C63] border-2 w-full max-w-[18rem] rounded-xl backdrop-blur-md">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-3">
           <div className="w-2 h-2 rounded-full bg-[#F39C63]" />

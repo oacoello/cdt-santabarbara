@@ -236,7 +236,7 @@ export function SimulatorTab({
           {collapsedPanels.location ? (
             <CollapsedPanelButton label="Localización" onClick={() => expandPanel("location")} />
           ) : (
-          <div className="bg-[#0A0A0B] p-5 rounded-[20px] border-2 border-[#F39C63] shadow-2xl">
+          <div className="bg-[#0A0A0B] p-3 2xl:p-5 rounded-[20px] border-2 border-[#F39C63] shadow-2xl">
             <div className="flex items-center justify-between mb-4">
               <div className="flex items-center gap-2 text-[#F39C63]">
                 <Globe className="w-4 h-4" />
@@ -282,7 +282,7 @@ export function SimulatorTab({
           {collapsedPanels.battery ? (
             <CollapsedPanelButton label="Config. batería" onClick={() => expandPanel("battery")} />
           ) : (
-          <div className="bg-[#0A0A0B]/60 backdrop-blur-xl p-5 rounded-[20px] border-2 border-[#F39C63] shadow-2xl">
+          <div className="bg-[#0A0A0B]/60 backdrop-blur-xl p-3 2xl:p-5 rounded-[20px] border-2 border-[#F39C63] shadow-2xl">
             <div className="mb-4 flex items-center justify-between gap-2">
               <p className="mb-0 text-[11px] font-black uppercase tracking-[0.2em] text-[#F39C63]">Configuración de Batería</p>
               <Button

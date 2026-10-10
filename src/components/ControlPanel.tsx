@@ -255,13 +255,13 @@ export function ControlPanel({
         isDragged ? "pointer-events-auto" : "pointer-events-auto"
       )}>
 
-        <div className="cdt-control-inner p-3">
-          <div className="cdt-control-sections flex flex-col lg:flex-row items-stretch gap-3">
+        <div className="cdt-control-inner p-3 pt-5">
+          <div className="cdt-control-sections flex flex-col lg:flex-row items-stretch gap-2 lg:gap-3 overflow-visible">
 
             {/* ─── Configuración de Arma ─── */}
-            <div className="cdt-card-weapon relative flex-none w-full lg:w-60 cdt-section-card h-[18rem] rounded-[18px] border-2 border-[#F39C63] px-4 pb-4 pt-8 bg-[#0A0A0E]">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0A0A0E] px-5">
-                <h2 className="text-lg font-black uppercase tracking-wide text-foreground leading-none whitespace-nowrap">Arma</h2>
+            <div className="cdt-card-weapon relative flex-none w-[220px] cdt-section-card h-[20rem] 2xl:h-[21rem] rounded-[18px] border-2 border-[#F39C63] px-4 pb-4 pt-8 bg-[#0A0A0E]">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0A0A0E] px-4">
+                <h2 className="text-sm xl:text-lg font-black uppercase tracking-wide text-foreground leading-none whitespace-nowrap">Arma</h2>
               </div>
               <div className="cdt-section-body space-y-2">
                 <div className="grid grid-cols-2 lg:grid-cols-1 gap-2">
@@ -309,9 +309,9 @@ export function ControlPanel({
             </div>
 
             {/* ─── Mapa Modelo ─── */}
-            <div className="cdt-card-map-model relative flex-none w-full lg:w-72 cdt-section-card h-[18rem] rounded-[18px] border-2 border-[#F39C63] px-5 pb-4 pt-8 bg-[#0A0A0E]">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0A0A0E] px-5">
-                <h2 className="text-lg font-black uppercase tracking-wide text-foreground leading-none whitespace-nowrap">Mapa modelo</h2>
+            <div className="cdt-card-map-model relative flex-none w-[320px] cdt-section-card h-[20rem] 2xl:h-[21rem] rounded-[18px] border-2 border-[#F39C63] px-3 xl:px-5 pb-4 pt-8 bg-[#0A0A0E]">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0A0A0E] px-3 xl:px-5">
+                <h2 className="text-sm xl:text-lg font-black uppercase tracking-wide text-foreground leading-none whitespace-nowrap">Mapa modelo</h2>
               </div>
               <div className="cdt-map-model-body space-y-3">
                 <div className="cdt-map-model-main-grid grid grid-cols-2 gap-x-4 gap-y-3">
@@ -385,9 +385,9 @@ export function ControlPanel({
             <Separator orientation="vertical" className="hidden h-32 my-auto bg-border" />
 
             {/* ─── Datos de Tiro ─── */}
-            <div className="cdt-card-firing relative flex-none w-full lg:w-64 xl:w-72 cdt-section-card h-[18rem] rounded-[18px] border-2 border-[#F39C63] px-4 pb-4 pt-8 bg-[#0A0A0E]">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0A0A0E] px-5">
-                <h2 className="text-lg font-black uppercase tracking-wide text-foreground leading-none whitespace-nowrap">Datos de tiro</h2>
+            <div className="cdt-card-firing relative flex-none w-[280px] cdt-section-card h-[20rem] 2xl:h-[21rem] rounded-[18px] border-2 border-[#F39C63] px-3 xl:px-4 pb-4 pt-8 bg-[#0A0A0E]">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0A0A0E] px-3 xl:px-5">
+                <h2 className="text-sm xl:text-lg font-black uppercase tracking-wide text-foreground leading-none whitespace-nowrap">Datos de tiro</h2>
               </div>
               <div className="space-y-1">
                 <FiringMetric label="DIST." value={sol && typeof sol.range === 'number' ? sol.range.toFixed(0) : "0"} unit="m" className="text-[#85C5F1]" />
@@ -415,9 +415,9 @@ export function ControlPanel({
             <Separator orientation="vertical" className="hidden h-32 my-auto bg-border" />
 
             {/* ─── Ajustes Manuales ─── */}
-            <div className="cdt-card-adjustments relative flex-[1.35] min-w-[500px] cdt-section-card h-[18rem] rounded-[18px] border-2 border-[#F39C63] px-5 pb-4 pt-8 bg-[#0A0A0E]">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0A0A0E] px-5">
-                <h2 className="text-lg font-black uppercase tracking-wide text-foreground leading-none whitespace-nowrap">Ajustes</h2>
+            <div className="cdt-card-adjustments relative flex-1 cdt-section-card h-[20rem] 2xl:h-[21rem] rounded-[18px] border-2 border-[#F39C63] px-3 xl:px-5 pb-4 pt-8 bg-[#0A0A0E]">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0A0A0E] px-3 xl:px-5">
+                <h2 className="text-sm xl:text-lg font-black uppercase tracking-wide text-foreground leading-none whitespace-nowrap">Ajustes</h2>
               </div>
               <div className="space-y-2">
                 <CoordinatePlacementRow
@@ -450,9 +450,9 @@ export function ControlPanel({
             <Separator orientation="vertical" className="hidden h-32 my-auto bg-border" />
 
             {/* ─── Acciones Finales ─── */}
-            <div className="cdt-card-actions relative flex-none min-w-[190px] cdt-section-card h-[18rem] rounded-[18px] border-2 border-[#F39C63] px-4 pb-4 pt-8 bg-[#0A0A0E]">
-              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0A0A0E] px-5">
-                <h2 className="text-lg font-black uppercase tracking-wide text-foreground leading-none whitespace-nowrap">Acciones</h2>
+            <div className="cdt-card-actions relative flex-none w-[180px] cdt-section-card h-[20rem] 2xl:h-[21rem] rounded-[18px] border-2 border-[#F39C63] px-3 xl:px-4 pb-4 pt-8 bg-[#0A0A0E]">
+              <div className="absolute -top-4 left-1/2 -translate-x-1/2 bg-[#0A0A0E] px-3 xl:px-4">
+                <h2 className="text-sm xl:text-lg font-black uppercase tracking-wide text-foreground leading-none whitespace-nowrap">Acciones</h2>
               </div>
               <div className="flex h-full flex-col items-center justify-around gap-3">
                 <Button
@@ -597,25 +597,31 @@ function CoordinatePlacementRow({
   onClear: () => void;
 }) {
   return (
-    <div className="cdt-coordinate-row grid grid-cols-[88px_repeat(3,minmax(92px,1fr))_124px_48px] items-end gap-2 border-b border-border/70 pb-2 last:border-b-0 last:pb-0">
-      <div className="pb-2 text-[11px] font-black uppercase tracking-wider text-foreground">
+    <div className="cdt-coordinate-row grid grid-cols-[60px_repeat(3,1fr)_minmax(100px,124px)_40px] xl:grid-cols-[80px_repeat(3,1fr)_140px_48px] items-end gap-1 xl:gap-2 border-b border-border/70 pb-2 last:border-b-0 last:pb-0">
+      <div className="pb-2 text-[9px] xl:text-[11px] font-black uppercase tracking-wider text-foreground">
         {label}
       </div>
       <CoordinateField label="Este" value={value.e} onChange={(next) => onChange('e', next)} />
       <CoordinateField label="Norte" value={value.n} onChange={(next) => onChange('n', next)} />
       <CoordinateField label="Altura" value={value.alt} onChange={(next) => onChange('alt', next)} />
-      <Button
-        onClick={onPlace}
-        className="h-9 rounded-xl bg-[#C5D8D6] text-black hover:bg-[#C5D8D6]/90 text-[10px] leading-none font-black uppercase tracking-wide"
-      >
-        <span className="whitespace-pre-line">{buttonLabel.replace(" ", "\n")}</span>
-      </Button>
-      <Button
-        onClick={onClear}
-        className="h-9 rounded-xl bg-[#FF7D73] text-[#171717] hover:bg-[#FF7D73]/90 text-[11px] leading-none font-black uppercase tracking-wide gap-0"
-      >
-        <span className="material-symbols-outlined text-xl leading-none text-[#171717]">delete</span>
-      </Button>
+      <div className="flex flex-col space-y-1 justify-end">
+        <span className="text-[10px] uppercase font-bold text-transparent ml-1 tracking-wider select-none">.</span>
+        <Button
+          onClick={onPlace}
+          className="h-11 w-full rounded-xl bg-[#C5D8D6] text-black hover:bg-[#C5D8D6]/90 text-[10px] xl:text-[11px] leading-none font-black uppercase tracking-tighter xl:tracking-wide px-0"
+        >
+          <span className="whitespace-pre-line text-center leading-tight">{buttonLabel.replace(" ", "\n")}</span>
+        </Button>
+      </div>
+      <div className="flex flex-col space-y-1 justify-end">
+        <span className="text-[10px] uppercase font-bold text-transparent ml-1 tracking-wider select-none">.</span>
+        <Button
+          onClick={onClear}
+          className="h-11 w-full rounded-xl bg-[#FF7D73] text-[#171717] hover:bg-[#FF7D73]/90 text-[11px] leading-none font-black uppercase tracking-wide gap-0 px-0"
+        >
+          <span className="material-symbols-outlined text-xl leading-none text-[#171717]">delete</span>
+        </Button>
+      </div>
     </div>
   );
 }
@@ -637,7 +643,7 @@ function CoordinateField({
         inputMode="numeric"
         value={value}
         onChange={(e) => onChange(e.target.value)}
-        className="cdt-coordinate-input w-full bg-background border border-border h-8 text-sm font-mono font-black rounded-xl hover:bg-secondary transition-colors px-3 text-[#F39C63]"
+        className="cdt-coordinate-input w-full bg-background border border-border h-11 text-lg font-mono font-black rounded-xl hover:bg-secondary transition-colors px-4 text-[#F39C63]"
       />
     </label>
   );

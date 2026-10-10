@@ -1,6 +1,6 @@
 {
   "name": "santa-barbara-fdc",
-  "version": "0.2.0",
+  "version": "0.2.9",
   "private": true,
   "main": "main.js",
   "scripts": {
@@ -152,7 +152,7 @@
       "main": "main.js",
       "dependencies": {},
       "name": "santa-barbara-fdc",
-      "version": "0.2.0",
+      "version": "0.2.9",
       "description": "Centro de tiro de cálculo automático para artillería.",
       "author": "Universidad de Defensa de Honduras UDH"
     },

@@ -55,8 +55,8 @@ function check(target) {
     'Missing copied Next static assets'
   );
   assertExists(
-    path.join(root, 'assets', 'splash_cdt.gif'),
-    'Missing startup splash GIF'
+    path.join(root, 'assets', 'Splash_screen_cdt.png'),
+    'Missing startup splash PNG'
   );
   assertExists(targetBinary[target], `Missing HP71 ${target} binary`);
 }

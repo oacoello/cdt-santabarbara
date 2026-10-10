@@ -26,6 +26,7 @@ export type CdtLaunchContext = {
   deviceId: string;
   applicationCode: "cdt";
   sessionId?: string;
+  authUrl?: string;
   profile?: Partial<AuthenticatedCdtProfile>;
 };
 

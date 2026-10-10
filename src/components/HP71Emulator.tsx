@@ -231,35 +231,12 @@ function ensureSinglePrompt(text: string): string {
 
 async function fetchHp71Display(command: string): Promise<string> {
   const encoded = encodeURIComponent(command);
-
-  if (process.env.NODE_ENV === "development") {
-    try {
-      const directRes = await fetch("http://127.0.0.1:8080/input", {
-        method: "POST",
-        headers: { "Content-Type": "application/x-www-form-urlencoded" },
-        body: `cmd=${encoded}`,
-      });
-
-      if (directRes.ok) return await directRes.text();
-    } catch {
-      // Fall back to the Next proxy below.
-    }
-  }
-
   const proxyRes = await fetch(`/api/hp71?cmd=${encoded}`, { method: "POST" });
   const json = await proxyRes.json();
   return json.display || "";
 }
 
 async function fetchHp71Record(): Promise<Hp71RecordData | null> {
-  try {
-    if (process.env.NODE_ENV === "development") {
-      const directRes = await fetch("http://127.0.0.1:8080/record", { cache: "no-store" });
-      if (directRes.ok) return await directRes.json();
-    }
-  } catch {
-    // Fall back to the Next proxy below.
-  }
 
   try {
     const proxyRes = await fetch("/api/hp71/record", { cache: "no-store" });

@@ -7,7 +7,7 @@ const path = require('path');
 
 const isDev = process.env.NODE_ENV === 'development';
 let NEXT_PORT = process.env.CDT_NEXT_PORT || '3210';
-const HP71_PORT = process.env.CDT_HP71_PORT || '8080';
+let HP71_PORT = process.env.CDT_HP71_PORT || '8171';
 const DEFAULT_AUTH_SECRET = 'santa-barbara-secret-key-2026-tactical-direction';
 const SPLASH_WIDTH = 780;
 const SPLASH_HEIGHT = 524;
@@ -43,12 +43,13 @@ function readCdtLaunchContext() {
   const deviceId = readArgValue('deviceId') || readArgValue('device-id');
   const applicationCode = readArgValue('applicationCode') || readArgValue('application-code');
   const profileJson = readArgValue('profileJson') || readArgValue('profile-json');
+  const authUrl = readArgValue('authUrl') || readArgValue('auth-url');
 
   if (!sessionToken || !deviceId || !applicationCode || applicationCode.toLowerCase() !== 'cdt') {
     return null;
   }
 
-  return { sessionToken, deviceId, applicationCode: applicationCode.toLowerCase(), profileJson };
+  return { sessionToken, deviceId, applicationCode: applicationCode.toLowerCase(), profileJson, authUrl };
 }
 
 function appendRuntimeLog(fileName, message) {
@@ -161,7 +162,7 @@ function getGifDurationMs(filePath) {
 }
 
 function showSplashWindow() {
-  const splashPath = getAssetPath('splash_cdt.gif');
+  const splashPath = getAssetPath('Splash_screen_cdt.png');
 
   if (!fs.existsSync(splashPath)) {
     return Promise.resolve();
@@ -197,7 +198,7 @@ function showSplashWindow() {
       resolve();
     };
 
-    const duration = getGifDurationMs(splashPath);
+    const duration = SPLASH_FALLBACK_MS;
     splash.once('closed', finish);
     splash.webContents.once('did-fail-load', finish);
     setTimeout(finish, duration);
@@ -291,6 +292,7 @@ function startNextServer() {
       ...(cdtLaunchContext?.deviceId ? { CDT_DEVICE_ID: cdtLaunchContext.deviceId } : {}),
       ...(cdtLaunchContext?.applicationCode ? { CDT_APPLICATION_CODE: cdtLaunchContext.applicationCode } : {}),
       ...(cdtLaunchContext?.profileJson ? { CDT_PROFILE_JSON: cdtLaunchContext.profileJson } : {}),
+      ...(cdtLaunchContext?.authUrl ? { CDT_AUTH_URL: cdtLaunchContext.authUrl } : {}),
     },
     stdio: ['ignore', 'pipe', 'pipe'],
     windowsHide: true,
@@ -335,7 +337,7 @@ function startHp71Server() {
     }
   }
 
-  hp71Process = spawn(executablePath, [], {
+  hp71Process = spawn(executablePath, [HP71_PORT], {
     cwd: path.dirname(executablePath),
     env: {
       ...process.env,
@@ -397,6 +399,7 @@ app.whenReady().then(async () => {
   Menu.setApplicationMenu(null);
   if (!isDev) {
     NEXT_PORT = await chooseAvailablePort(NEXT_PORT);
+    HP71_PORT = await chooseAvailablePort(HP71_PORT);
   }
   configurePermissions();
   const splashPromise = showSplashWindow();

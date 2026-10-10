@@ -23,7 +23,9 @@ function readContextFromEnv(): CdtLaunchContext | null {
     ? JSON.parse(process.env.CDT_PROFILE_JSON)
     : undefined;
 
-  return { sessionToken, deviceId, applicationCode, profile };
+  const authUrl = process.env.CDT_AUTH_URL;
+
+  return { sessionToken, deviceId, applicationCode: "cdt", profile, authUrl };
 }
 
 function buildProfile(
@@ -75,7 +77,13 @@ export async function GET() {
   }
 
   try {
-    const response = await fetch(`${getCdtAuthBaseUrl()}/auth/validate`, {
+    const controller = new AbortController();
+    const timeout = setTimeout(() => controller.abort(), 10000);
+
+    const authUrl = context.authUrl ?? getCdtAuthBaseUrl();
+    console.log("[CDT AUTH] Intentando validar con URL:", authUrl);
+
+    const response = await fetch(`${authUrl}/auth/validate`, {
       method: "POST",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
@@ -85,7 +93,10 @@ export async function GET() {
         requiredPermissions: CDT_REQUIRED_PERMISSIONS,
       }),
       cache: "no-store",
+      signal: controller.signal,
     });
+
+    clearTimeout(timeout);
 
     if (!response.ok) {
       return NextResponse.json(

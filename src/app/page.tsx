@@ -347,7 +347,7 @@ export default function SantaBarbaraFDC() {
 
   if (sessionState.status === 'loading') {
     return (
-      <main className="cdt-app-shell relative flex h-[100dvh] min-h-[720px] w-full min-w-[1100px] items-center justify-center bg-[#0A0A0E] text-white font-['Stack_Sans_Text']">
+      <main className="cdt-app-shell relative flex h-full min-h-[720px] w-full min-w-[1100px] items-center justify-center bg-[#0A0A0E] text-white font-['Stack_Sans_Text']">
         <TacticalBackground />
         <Card className="relative z-10 max-w-lg border-[#F39C63]/30 bg-black/80 p-8 text-center">
           <h1 className="text-xs font-black uppercase tracking-[0.3em] text-[#F39C63]">Validando sesión CDT</h1>
@@ -359,7 +359,7 @@ export default function SantaBarbaraFDC() {
 
   if (sessionState.status === 'blocked') {
     return (
-      <main className="cdt-app-shell relative flex h-[100dvh] min-h-[720px] w-full min-w-[1100px] items-center justify-center bg-[#0A0A0E] text-white font-['Stack_Sans_Text']">
+      <main className="cdt-app-shell relative flex h-full min-h-[720px] w-full min-w-[1100px] items-center justify-center bg-[#0A0A0E] text-white font-['Stack_Sans_Text']">
         <TacticalBackground />
         <Card className="relative z-10 max-w-xl border-red-500/40 bg-black/85 p-8 text-center">
           <h1 className="text-sm font-black uppercase tracking-[0.3em] text-red-400">Acceso bloqueado</h1>
@@ -371,7 +371,7 @@ export default function SantaBarbaraFDC() {
   }
 
   return (
-    <main className="cdt-app-shell relative flex h-[100dvh] min-h-[720px] w-full min-w-[1100px] flex-col overflow-auto bg-transparent font-['Stack_Sans_Text']">
+    <main className="cdt-app-shell relative flex h-full min-h-[600px] w-full min-w-[1100px] flex-col overflow-auto bg-transparent font-['Stack_Sans_Text']">
 
       {/* CAPA 0: FONDO TÁCTICO FIJO */}
       <div className="fixed inset-0 z-0 pointer-events-none">

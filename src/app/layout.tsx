@@ -1,5 +1,6 @@
 import './globals.css';
 import SessionWrapper from '@/components/SessionWrapper';
+import ScaleWrapper from '@/components/ScaleWrapper';
 
 export default function RootLayout({
   children,
@@ -19,27 +20,25 @@ export default function RootLayout({
           href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined:opsz,wght,FILL,GRAD@20..48,100..700,0..1,-50..200&icon_names=assignment,delete,destruction"
         />
       </head>
-      {/* CRITICAL: Do not use inter.className here. 
-          The 'antialiased' class allows the custom font-family 
-          defined in globals.css to take priority.
-      */}
-      <body className="antialiased">
+      <body className="antialiased m-0 p-0 overflow-hidden h-screen w-screen">
         <SessionWrapper>
-          <div 
-            className="relative min-h-screen w-full overflow-x-hidden"
-            style={{ 
-              backgroundImage: `url('/mesh-719.jpg')`, 
-              backgroundSize: 'cover',
-              backgroundPosition: 'center' 
-            }}
-          >
-            {/* Dark overlay to ensure tactical text legibility */}
-            <div className="absolute inset-0 bg-black/40 pointer-events-none" />
-            
-            <div className="relative z-10">
-              {children}
+          <ScaleWrapper>
+            <div 
+              className="relative h-full w-full overflow-hidden"
+              style={{ 
+                backgroundImage: `url('/Splash_screen_cdt.png')`, 
+                backgroundSize: 'cover',
+                backgroundPosition: 'center' 
+              }}
+            >
+              {/* Dark overlay to ensure tactical text legibility */}
+              <div className="absolute inset-0 bg-black/40 pointer-events-none" />
+              
+              <div className="relative z-10 h-full w-full">
+                {children}
+              </div>
             </div>
-          </div>
+          </ScaleWrapper>
         </SessionWrapper>
       </body>
     </html>

@@ -62,7 +62,7 @@ export function MeteorologyPanel({ position, onCollapse }: MeteorologyPanelProps
   }, []);
 
   return (
-    <Card className="p-3 bg-transparent border-[#F39C63] border-2 w-72 backdrop-blur-sm rounded-xl">
+    <Card className="p-3 bg-transparent border-[#F39C63] border-2 w-full max-w-[18rem] backdrop-blur-sm rounded-xl">
       <div className="flex items-center justify-between mb-3">
         <div className="flex items-center gap-2">
           <Cloud className="w-3 h-3 text-[#F39C63]" />

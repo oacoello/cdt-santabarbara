@@ -29,7 +29,3 @@ target_include_directories(hp71_emulator PRIVATE
 ../saturn_core
 ../external
 )
-
-if(UNIX AND NOT APPLE)
-  target_link_options(hp71_emulator PRIVATE -static-libstdc++ -static-libgcc)
-endif()

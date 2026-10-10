@@ -19,9 +19,3 @@
   done:
 !macroend
 
-!macro customHeader
-  ; User cancellation maps to ERROR_CANCELLED for Microsoft Store reporting.
-  Function .onUserAbort
-    SetErrorLevel 1223
-  FunctionEnd
-!macroend
